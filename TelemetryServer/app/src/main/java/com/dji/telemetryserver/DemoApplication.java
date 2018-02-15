@@ -29,6 +29,9 @@ public class DemoApplication extends Application {
     private BaseProduct.BaseProductListener mDJIBaseProductListener;
     private BaseComponent.ComponentListener mDJIComponentListener;
 
+    //servers and logging.
+    TelemetryService telemetryService;
+
     private Application instance;
     public void setContext(Application application) {
         instance = application;
@@ -37,6 +40,11 @@ public class DemoApplication extends Application {
     @Override
     public Context getApplicationContext() {
         return instance;
+    }
+    private static Context _mContext;
+
+    public static Context getContext(){
+        return _mContext;
     }
 
     public DemoApplication() {
@@ -57,6 +65,8 @@ public class DemoApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        _mContext = this;//for static context
+
         mHandler = new Handler(Looper.getMainLooper());
 
 
@@ -71,6 +81,7 @@ public class DemoApplication extends Application {
             @Override
             public void onRegister(DJIError error) {
                 if(error == DJISDKError.REGISTRATION_SUCCESS) {
+                    telemetryService = new TelemetryService(getApplicationContext());
                     DJISDKManager.getInstance().startConnectionToProduct();
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {

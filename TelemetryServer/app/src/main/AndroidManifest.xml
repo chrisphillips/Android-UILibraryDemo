@@ -50,9 +50,11 @@
         <meta-data
             android:name="com.dji.sdk.API_KEY"
             android:value="" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="" />
+            android:value="" /> //TODO: Enter your Google API Key here
+
         <activity
             android:name="dji.sdk.sdkmanager.DJIAoaControllerActivity"
             android:theme="@android:style/Theme.Translucent">

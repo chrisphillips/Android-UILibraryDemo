@@ -1,4 +1,4 @@
-package com.dji.uilibrarydemo;
+package com.dji.telemetryserver;
 
 import android.app.Application;
 import android.content.Context;

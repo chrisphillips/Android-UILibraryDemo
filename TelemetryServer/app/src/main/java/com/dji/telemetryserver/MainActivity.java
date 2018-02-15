@@ -1,16 +1,10 @@
-package com.dji.uilibrarydemo;
+package com.dji.telemetryserver;
 
 import android.Manifest;
 import android.os.Build;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
-
-import dji.common.error.DJIError;
-import dji.common.useraccount.UserAccountState;
-import dji.common.util.CommonCallbacks;
-import dji.sdk.useraccount.UserAccountManager;
 
 public class MainActivity extends AppCompatActivity {
 

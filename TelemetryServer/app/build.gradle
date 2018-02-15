@@ -38,6 +38,10 @@ android {
         doNotStrip "*/*/libUpgradeVerify.so"
         doNotStrip "*/*/libFR.so"
     }
+    compileOptions {
+        targetCompatibility 1.8
+        sourceCompatibility 1.8
+    }
 }
 
 dependencies {
@@ -45,8 +49,7 @@ dependencies {
     compile 'com.android.support:appcompat-v7:25.1.0'
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:multidex:1.0.1'
-
-    compile ('com.dji:dji-uilibrary:4.4.1')
-    provided ('com.dji:dji-sdk-provided:4.4.1')
-
+    compile 'com.dji:dji-uilibrary:4.4.1'
+    provided 'com.dji:dji-sdk-provided:4.4.1'
+    implementation 'com.google.android.gms:play-services-maps:11.8.0'
 }

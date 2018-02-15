@@ -49,11 +49,11 @@
 
         <meta-data
             android:name="com.dji.sdk.API_KEY"
-            android:value="25a467c9c83c26a2ec7957b7" />
+            android:value="" />
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAXsaFn3aJg3ajfNij-p0r4nR569fyTnC4" /> //TODO: Enter your Google API Key here
+            android:value="" /> //TODO: Enter your Google API Key here
 
         <activity
             android:name="dji.sdk.sdkmanager.DJIAoaControllerActivity"

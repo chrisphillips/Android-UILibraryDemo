@@ -110,6 +110,7 @@ public class DemoApplication extends Application {
             @Override
             public void onProductChange(BaseProduct oldProduct, BaseProduct newProduct) {
 
+                Toast.makeText(getApplicationContext(), "onProductChange", Toast.LENGTH_LONG).show();
                 mProduct = newProduct;
                 if(mProduct != null) {
                     mProduct.setBaseProductListener(mDJIBaseProductListener);
@@ -124,14 +125,25 @@ public class DemoApplication extends Application {
             @Override
             public void onComponentChange(BaseProduct.ComponentKey key, BaseComponent oldComponent, BaseComponent newComponent) {
 
+                telemetryService.log("mDJIBaseProductListener onComponentChange "+key);
+                Toast.makeText(getApplicationContext(), "onComponentChange "+key, Toast.LENGTH_LONG).show();
                 if(newComponent != null) {
                     newComponent.setComponentListener(mDJIComponentListener);
+                    ExampleFragment.getInstance().initPreview();
+
                 }
+
+//                    telemetryService.log("Install Hook"+key);
+//                if(key.equals("CAMERA"))
+//                    ExampleFragment.getInstance().initPreview();
+
                 notifyStatusChange();
             }
 
             @Override
             public void onConnectivityChange(boolean isConnected) {
+                telemetryService.log("mDJIBaseProductListener onConnectivityChange "+isConnected);
+                Toast.makeText(getApplicationContext(), "mDJIBaseProductListener onConnectivityChange", Toast.LENGTH_LONG).show();
 
                 notifyStatusChange();
             }
@@ -142,6 +154,9 @@ public class DemoApplication extends Application {
 
             @Override
             public void onConnectivityChange(boolean isConnected) {
+                telemetryService.log("mDJIComponentListener onConnectivityChange "+isConnected);
+                Toast.makeText(getApplicationContext(), "XXXXXX mDJIComponentListener onConnectivityChange", Toast.LENGTH_LONG).show();
+
                 notifyStatusChange();
             }
 
@@ -174,6 +189,7 @@ public class DemoApplication extends Application {
     }
 
     private void notifyStatusChange() {
+
         mHandler.removeCallbacks(updateRunnable);
         mHandler.postDelayed(updateRunnable, 500);
     }

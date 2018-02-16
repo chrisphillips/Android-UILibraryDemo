@@ -299,6 +299,12 @@
 
     </LinearLayout>
 
+    <fragment android:name="com.dji.telemetryserver.ExampleFragment"
+        android:id="@+id/viewer"
+        android:layout_weight="2"
+        android:layout_width="300dp"
+        android:layout_height="400dp" />
+
     <!-- Pre-flight checklist panel -->
     <dji.ui.panel.PreFlightCheckListPanel
         android:layout_width="400dp"

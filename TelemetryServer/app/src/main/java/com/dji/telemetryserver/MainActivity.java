@@ -1,6 +1,7 @@
 package com.dji.telemetryserver;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -63,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
 
+        //hide system nav buttons to give more space.
         getWindow().getDecorView().setSystemUiVisibility(flags);
 
         // Code below is to handle presses of Volume up or Volume down.
@@ -110,26 +112,25 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapFragment.getMapAsync(this);
 
         //Setup map/fpv swap on pip touch.
-        Button pipOverlay = (Button)findViewById(R.id.pipOverlay);
-        RelativeLayout pipContainer = (RelativeLayout)findViewById(R.id.pipContainer);
+        Button pipOverlay = (Button) findViewById(R.id.pipOverlay);
+        RelativeLayout pipContainer = (RelativeLayout) findViewById(R.id.pipContainer);
 //        pipContainer.bringToFront();
 
         pipOverlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                RelativeLayout fpvContainer = (RelativeLayout)findViewById(R.id.fpvContainer);
-                RelativeLayout pipContainer = (RelativeLayout)findViewById(R.id.pipContainer);
-                View mapView= findViewById(R.id.map);
-                View fpvView= findViewById(R.id.fpv);
-                if(!isMapMode) {
+                RelativeLayout fpvContainer = (RelativeLayout) findViewById(R.id.fpvContainer);
+                RelativeLayout pipContainer = (RelativeLayout) findViewById(R.id.pipContainer);
+                View mapView = findViewById(R.id.map);
+                View fpvView = findViewById(R.id.fpv);
+                if (!isMapMode) {
                     pipContainer.removeView(mapView);
                     fpvContainer.removeView(fpvView);
                     pipContainer.addView(fpvView);
                     fpvContainer.addView(mapView);
                     map.getUiSettings().setCompassEnabled(true);
                     map.getUiSettings().setMyLocationButtonEnabled(true);
-                }
-                else{
+                } else {
                     pipContainer.removeView(fpvView);
                     fpvContainer.removeView(mapView);
                     pipContainer.addView(mapView);
@@ -137,19 +138,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     map.getUiSettings().setCompassEnabled(false);
                     map.getUiSettings().setMyLocationButtonEnabled(false);
                 }
-                isMapMode=!isMapMode;
+                isMapMode = !isMapMode;
             }
         });
 
-        ImageButton setupButton = (ImageButton)findViewById(R.id.setupButton);
+        ImageButton setupButton = (ImageButton) findViewById(R.id.setupButton);
         setupButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                LinearLayout settingsPanel = (LinearLayout)findViewById(R.id.settingsPanel);
-                if(settingsPanel.getVisibility()==View.VISIBLE) {
+                LinearLayout settingsPanel = (LinearLayout) findViewById(R.id.settingsPanel);
+                if (settingsPanel.getVisibility() == View.VISIBLE) {
                     settingsPanel.setVisibility(View.INVISIBLE);
-                }
-                else{
+                } else {
                     settingsPanel.setVisibility(View.VISIBLE);
                 }
             }
@@ -157,7 +157,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //Is map or fpv in main view?
-    public boolean isMapMode=false;
+    public boolean isMapMode = false;
 
     @Override
     public void onMapReady(GoogleMap retMap) {
@@ -165,6 +165,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setUpMap();
 
     }
+
+    static private LocationManager locationManager=null;
 
     public void setUpMap() {
 
@@ -186,12 +188,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.getUiSettings().setMyLocationButtonEnabled(false);
 
         //zoom to initial location.
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         Criteria criteria = new Criteria();
 
         Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
-        if (location != null)
-        {
+        if (false){//location != null) {
             //here where the camera animate and zoom to particular location.
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(location.getLatitude(), location.getLongitude()), 14));
@@ -207,23 +208,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    void getCurrentLocation()
-    {
-        Location myLocation  = map.getMyLocation();
-        if(myLocation!=null)
-        {
-            double dLatitude = myLocation.getLatitude();
-            double dLongitude = myLocation.getLongitude();
-            map.addMarker(new MarkerOptions().position(new LatLng(dLatitude, dLongitude))
-                    .title("My Location").icon(BitmapDescriptorFactory
-                            .defaultMarker(BitmapDescriptorFactory.HUE_RED)));
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(dLatitude, dLongitude), 8));
+    public static Location getCurrentLocation() {
+        if(true || locationManager==null)
+            return null;
 
+        Criteria criteria = new Criteria();
+/*        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return null;
         }
-        else
-        {
-            Toast.makeText(this, "Unable to fetch the current location", Toast.LENGTH_SHORT).show();
-        }
+*/        //Todo: Is this efficent?
+        @SuppressLint("MissingPermission")
+        Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
+
+        return location;
     }
     private void takeScreenshot() {
         Date now = new Date();

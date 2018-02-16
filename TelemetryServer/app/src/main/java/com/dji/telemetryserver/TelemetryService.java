@@ -2,7 +2,9 @@ package com.dji.telemetryserver;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.location.Location;
 import android.os.Environment;
+import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
@@ -37,6 +39,11 @@ import dji.sdk.sdkmanager.DJISDKManager;
 public class TelemetryService {
 
     public Context context;
+    private static TelemetryService instance;
+    public static TelemetryService getInstance()
+    {
+        return instance;
+    }
 
     //These are the keys that will be logged in the Remote group.
     public String[] remoteControllerListenKeys = {
@@ -111,10 +118,14 @@ public class TelemetryService {
     //enable to broadcast to a upd port on another machine
     private UDPClient udpClient=null;// new UDPClient("192.168.1.17",9001);
 
+    public String getTimeStamp()
+    {
+        return new SimpleDateFormat("yy-MM-dd HH:mm:ss.SSS ").format(new Date());
+    }
     public void log(String message)
     {
         //add timestamp.
-        String timeStamp = new SimpleDateFormat("yy-MM-dd HH:mm:ss.SSS ").format(new Date());
+        String timeStamp = getTimeStamp();
         message=timeStamp+message;
 
         //write to log file
@@ -147,7 +158,8 @@ public class TelemetryService {
 
                     //save connection for future messages.
                     webSockets.add(webSocket);
-                    webSocket.send("Welcome Client");
+                    //log("Log Connected.");
+                    webSocket.send( getTimeStamp()+"Client connected.");
 
                     //Cleanup socket on close.
                     webSocket.setClosedCallback(new CompletedCallback() {
@@ -174,17 +186,13 @@ public class TelemetryService {
         //start server on port 3001
         websocketServer.listen(3001);
 
-        httpServer.get("/", new HttpServerRequestCallback() {
+        httpServer.get("/screens/.*", new HttpServerRequestCallback() {
             @Override
             public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
-                //response.send("<body>Hello!!!</body> ");
-
-                //Context context = DemoApplication.getContext();
                 AssetManager am =context.getAssets();
                 try {
-                    InputStream ins = am.open("cesium.html");
-                    byte[] bytes = new byte[0];
-                    bytes = new byte[ins.available()];
+                    InputStream ins = am.open("3dview.html");
+                    byte[] bytes = new byte[ins.available()];
                     ins.read(bytes);
                     ins.close();
                     response.send("text/html; charset=utf-8",bytes);
@@ -195,6 +203,31 @@ public class TelemetryService {
                 //response.s
             }
         });
+
+        httpServer.get("/.*", new HttpServerRequestCallback() {
+            @Override
+            public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
+                AssetManager am =context.getAssets();
+                try {
+                    String path = request.getPath();
+                    if(path.equals("/"))
+                    {
+                        path = "/index.html";
+                    }
+                    path=path.substring(1);//get rid of leading /
+                    InputStream ins = am.open(path);
+                    byte[] bytes = new byte[ins.available()];
+                    ins.read(bytes);
+                    ins.close();
+                    response.send("text/html; charset=utf-8",bytes);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            //todo handle 404 etc.
+                //response.s
+            }
+        });
+
         httpServer.listen(5001);
     }
     //Start the services on construction.
@@ -209,6 +242,25 @@ public class TelemetryService {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         logPath = logDir + "Log_" + timeStamp + ".txt";
         log("Logging started "+logPath);
+
+        Handler handler = new Handler();
+        int delay = 1000; //milliseconds
+
+        //start heartbeat thread.
+        handler.postDelayed(new Runnable(){
+            public void run(){
+
+                Location loc = MainActivity.getCurrentLocation();
+                if(loc!=null) {
+                    //hack. send phone loc as heat beat. probably better way to do this.
+                    log("P:" + String.valueOf(loc.getLatitude()) + " " +
+                            String.valueOf(loc.getLongitude()) + " " +
+                            String.valueOf(loc.getBearing())
+                    );
+                }
+                handler.postDelayed(this, delay);
+            }
+        }, delay);
 
         //Listen for websocket connections.
         createWebserver();

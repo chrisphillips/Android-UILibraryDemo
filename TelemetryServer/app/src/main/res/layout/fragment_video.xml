@@ -1,19 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.ecolumbia.djgs.VideoFragment">
 
+    <!-- TODO: Update blank fragment layout -->
     <TextureView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/videoTextureView"
-        android:layout_gravity="center_horizontal" />
+        android:id="@+id/livestream_preview_ttv" />
+    <!--    <SurfaceView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/livestream_preview_sv"/>
+     -->
+        <SurfaceView
+            android:layout_width="320dp"
+            android:layout_height="240dp"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginTop="40dp"
+            android:id="@+id/mypreview"/>
+        <TextView
+            android:layout_width="match_parent"
+            android:background="@color/white"
+            android:layout_height="20dp"
+            android:id="@+id/tv_OnTopVideo"
+            android:text="@string/hello_blank_fragment" />
 
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/videoImageView"
-        android:layout_gravity="left|bottom"
-        android:adjustViewBounds="true"
-        android:visibility="invisible" />
-</FrameLayout>
+    </RelativeLayout>

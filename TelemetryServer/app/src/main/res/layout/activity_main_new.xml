@@ -19,13 +19,20 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical">
-            <dji.ui.widget.FPVWidget
+
+            <fragment android:name="com.dji.telemetryserver.VideoFragment"
+                android:id="@+id/plusonefrag"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>
 
+            <!-- Widget to see first person view (FPV)
+            <dji.ui.widget.FPVWidget
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
             <dji.ui.widget.FPVOverlayWidget
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>
+           -->
 
             <dji.ui.widget.compass.CompassCalibratingWorkFlow
                 android:layout_width="match_parent"
@@ -299,11 +306,16 @@
 
     </LinearLayout>
 
+    <!-- fpv
     <fragment android:name="com.dji.telemetryserver.ExampleFragment"
         android:id="@+id/viewer"
-        android:layout_weight="2"
-        android:layout_width="300dp"
+        android:layout_width="400dp"
+
+        android:background="@color/dark_gray"
+
         android:layout_height="400dp" />
+    -->
+
 
     <!-- Pre-flight checklist panel -->
     <dji.ui.panel.PreFlightCheckListPanel

@@ -16,6 +16,7 @@ import com.koushikdutta.async.http.server.AsyncHttpServerResponse;
 import com.koushikdutta.async.http.server.HttpServerRequestCallback;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,10 +40,16 @@ import dji.sdk.sdkmanager.DJISDKManager;
 public class TelemetryService {
 
     public Context context;
-    private static TelemetryService instance;
+    private static TelemetryService instance=null;
     public static TelemetryService getInstance()
     {
         return instance;
+    }
+
+    public static void Log(String message)
+    {
+        if(instance!=null)
+            instance.log(message);
     }
 
     //These are the keys that will be logged in the Remote group.
@@ -130,7 +137,7 @@ public class TelemetryService {
 
         //write to log file
         if(logPath!=null)
-            appendToFile(logPath,message+"\n");
+            appendToFile(logPath,message+"\r\n");
 
         //broadcast to connected websockets
         for(WebSocket socket : webSockets)
@@ -186,17 +193,21 @@ public class TelemetryService {
         //start server on port 3001
         websocketServer.listen(3001);
 
+        //web serve screenshots.
         httpServer.get("/screens/.*", new HttpServerRequestCallback() {
             @Override
             public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
                 AssetManager am =context.getAssets();
                 try {
-                    InputStream ins = am.open("3dview.html");
+                    String path = Environment.getExternalStorageDirectory() + "/DJI_Telemetry"+request.getPath();
+                    InputStream ins =new FileInputStream(path);
                     byte[] bytes = new byte[ins.available()];
                     ins.read(bytes);
                     ins.close();
-                    response.send("text/html; charset=utf-8",bytes);
+                    response.send("image/jpeg",bytes);
                 } catch (IOException e) {
+                    response.code(404);//todo is this right way to send 404?
+                    response.send("");
                     e.printStackTrace();
                 }
 
@@ -204,6 +215,7 @@ public class TelemetryService {
             }
         });
 
+        //web serve html files.
         httpServer.get("/.*", new HttpServerRequestCallback() {
             @Override
             public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
@@ -212,7 +224,7 @@ public class TelemetryService {
                     String path = request.getPath();
                     if(path.equals("/"))
                     {
-                        path = "/index.html";
+                        path = "/index.html";//default to index if root
                     }
                     path=path.substring(1);//get rid of leading /
                     InputStream ins = am.open(path);
@@ -233,6 +245,7 @@ public class TelemetryService {
     //Start the services on construction.
     public TelemetryService(Context context)
     {
+        instance=this;
         this.context=context;
         //create log dir if needed.
         String logDir = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/logs/";
@@ -248,36 +261,43 @@ public class TelemetryService {
 
         //start heartbeat thread.
         handler.postDelayed(new Runnable(){
-            public void run(){
-
-                Location loc = MainActivity.getCurrentLocation();
-                if(loc!=null) {
-                    //hack. send phone loc as heat beat. probably better way to do this.
-                    log("P:" + String.valueOf(loc.getLatitude()) + " " +
-                            String.valueOf(loc.getLongitude()) + " " +
-                            String.valueOf(loc.getBearing())
-                    );
-                }
-                handler.postDelayed(this, delay);
-            }
+           public void run(){
+               try {
+                   Location loc = MainActivity.getCurrentLocation();
+                   if (loc != null) {
+                       //hack. send phone loc as heat beat. probably better way to do this.
+                       log("P:location " + String.valueOf(loc.getLatitude()) + " " +
+                               String.valueOf(loc.getLongitude()) + " " +
+                               String.valueOf(loc.getBearing())
+                       );
+                   }
+                   handler.postDelayed(this, delay);
+               }catch(Exception e)
+               {
+                   //no errors on heart send.
+               }
+           }
         }, delay);
 
         //Listen for websocket connections.
         createWebserver();
 
         //Start all the key listners.
-        startListeners();
+//        startListeners();
     }
 
     //Start all the SDK Key listners.
     public void startListeners() {
         log("Starting listners");
+        if(DJISDKManager.getInstance()==null || DJISDKManager.getInstance().getKeyManager()==null )
+            return;//not ready yet.
+
         KeyManager keyManager = DJISDKManager.getInstance().getKeyManager();
 
         // Create a listener for each key in each group (Remote, Battery, FlightController etc).
         for (String key: remoteControllerListenKeys) {
             DJIKey djikey = RemoteControllerKey.create(key);
-            String keyName = "R:"+key;
+            String keyName = "R:"+key;//R: means remote message.
 
             //Do an initial get of the keys value.
             // TODO. This should probably be done in a separately. You might not always want to get an inital.

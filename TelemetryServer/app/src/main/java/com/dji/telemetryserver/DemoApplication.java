@@ -88,9 +88,13 @@ public class DemoApplication extends Application {
                         @Override
                         public void run() {
                             Toast.makeText(getApplicationContext(), "Register Success", Toast.LENGTH_LONG).show();
+//                            DJISDKManager.getInstance().enableBridgeModeWithBridgeAppIP("192.168.1.2");
                         }
                     });
                     //loginAccount();
+
+                    //start listening to SDK keys for logging.
+                    TelemetryService.getInstance().startListeners();
 
                 } else {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -129,12 +133,14 @@ public class DemoApplication extends Application {
                 Toast.makeText(getApplicationContext(), "onComponentChange "+key, Toast.LENGTH_LONG).show();
                 if(newComponent != null) {
                     newComponent.setComponentListener(mDJIComponentListener);
-                    ExampleFragment.getInstance().initPreview();
+//                    ExampleFragment.getInstance().initPreview();
 
                 }
+//tell camera something has changed.
+VideoFragment.getInstance().notifyProductUpdate();
 
 //                    telemetryService.log("Install Hook"+key);
-//                if(key.equals("CAMERA"))
+//                if(key.name().equals("CAMERA"))
 //                    ExampleFragment.getInstance().initPreview();
 
                 notifyStatusChange();

@@ -104,13 +104,22 @@ window.viewer=viewer;
                #status.online {
                   background: #0c0;
                }
+               .preview {
+                  position:absolute;
+                  width:640px;
+                  height:360px;
+                  top:20px;
+                  left:20px;
+				  background:blue;
+               }
             </style>
 				
             <article>
                <p id = "status">Not connected</p>
                <ul id = "log"></ul>
             </article>
-				
+	
+
             <script>
 			//<form onsubmit = "addMessage(); return false;">
                 //<input type = "text" id = "chat" placeholder = "Send Command (not working yet)" />
@@ -121,6 +130,7 @@ window.viewer=viewer;
                log = document.getElementById("log");
                chat = document.getElementById("chat");
                state = document.getElementById("status");
+               
 					
                if (window.WebSocket === undefined) {
                   state.innerHTML = "sockets not supported";
@@ -137,6 +147,7 @@ window.viewer=viewer;
                function doConnect() {
 			   //var ip = "ws://"+ window.location.host+":3001";
                   var wsUri = "ws://"+ window.location.hostname+":3001";
+ //                 var wsUri = "ws://192.168.1.8:3001";
                   websocket = new WebSocket(wsUri);
                   websocket.onopen = function(evt) { onOpen(evt) };
                   websocket.onclose = function(evt) { onClose(evt) };
@@ -158,24 +169,42 @@ window.viewer=viewer;
 			
 			
                function onMessage(evt) {
-                     log.innerHTML = log.innerHTML+'<li class = "message">' + 
-                        evt.data.substring(9) + "</li>" ;//note substring cuts off date part of timestamp for brevity.
-//				var textarea = document.getElementById('textarea_id');
-				if(evt.data.indexOf("P:"))
+
+				if(evt.data.indexOf("P:")>0)//message from pc?
 				{
-					if(!window.startLocation){
-						var parts = evt.data.split("P:")[1].split(" ")
-						console.log(parts)
-						window.startLocation=parts
-						viewer.camera.flyTo({
-							destination : Cesium.Cartesian3.fromDegrees(parseFloat(parts[1]),parseFloat(parts[0]),1000.0)
-						});
+					var parts = evt.data.split("P:")[1].split(" ")
+					if(parts[0]==="screenshot")
+					{
+						var preview = document.getElementById("preview");
+						preview.src = parts[1];//update screenshot.
+						return;//dont display in log.
+					}else if(parts[0]==="location")
+					{
+						if(!window.startLocation){
+							console.log(parts)
+							window.startLocation=parts
+							viewer.camera.flyTo({
+								destination : Cesium.Cartesian3.fromDegrees(parseFloat(parts[2]),parseFloat(parts[1]),1000.0)
+							});
+						}
+						return;//dont display heatbeat in log.
+					}else
+					{
 					}
 				}
-
-
-
-
+				if(evt.data.indexOf("F:")>0)//message from flightcontroller?
+				{
+					var parts = evt.data.split("F:")[1].split(":")
+					if(parts[0]==="AircraftLocation")
+					{
+						//F:AircraftLocation:LocationCoordinate3D{latitude=47.76078060079433, longitude=-122.09482644836902, altitude=0.0}
+						return;//dont display in log.
+					}//else if(parts[0]==="location")
+				}				
+				
+				//add to log window.
+				 log.innerHTML = log.innerHTML+'<li class = "message">' + 
+					evt.data.substring(9) + "</li>" ;//note substring cuts off date part of timestamp for brevity.
 				log.scrollTop = log.scrollHeight;
 
                }
@@ -193,7 +222,8 @@ window.viewer=viewer;
 					
             </script>
          </section>
-		   
+		   <img id="preview" class="preview" src="">
+<img>
 </body>
 </html>
 

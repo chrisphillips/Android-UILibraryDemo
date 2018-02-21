@@ -15,29 +15,27 @@ import android.os.StrictMode;
 import android.speech.tts.TextToSpeech;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
 
+import com.dji.videostreamdecodingsample.media.DJIVideoStreamDecoder;
+import com.dji.videostreamdecodingsample.media.NativeHelper;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Date;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, VideoFragment.OnFragmentInteractionListenerVideo {
 
     private static final String TAG = MainActivity.class.getName();
     public TextToSpeech mTts;
@@ -97,6 +95,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         WindowManager.LayoutParams layout = getWindow().getAttributes();
         layout.screenBrightness = 1F;
         getWindow().setAttributes(layout);
+
 
 
         setContentView(R.layout.activity_main_new);
@@ -192,7 +191,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Criteria criteria = new Criteria();
 
         Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
-        if (false){//location != null) {
+        if (location != null) {
             //here where the camera animate and zoom to particular location.
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(location.getLatitude(), location.getLongitude()), 14));
@@ -209,7 +208,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     public static Location getCurrentLocation() {
-        if(true || locationManager==null)
+        if(locationManager==null)
             return null;
 
         Criteria criteria = new Criteria();
@@ -250,6 +249,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             // Several error may come out with file handling or DOM
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void onFragmentInteractionVideo(boolean bl_OnTopJustClicked) {
+
     }
 
 }

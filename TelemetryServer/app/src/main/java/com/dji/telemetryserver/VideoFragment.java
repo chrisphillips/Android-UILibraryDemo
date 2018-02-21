@@ -1,208 +1,259 @@
 package com.dji.telemetryserver;
 
-import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.content.Context;
+import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
+import android.graphics.YuvImage;
+import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import android.os.Environment;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.Toast;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import com.dji.videostreamdecodingsample.media.DJIVideoStreamDecoder;
+import com.dji.videostreamdecodingsample.media.NativeHelper;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.Camera;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.codec.DJICodecManager;
-import dji.sdk.base.BaseProduct;
 
 /**
- * Fragment. Displays live video feed of the drone and the people detected.
- * @author Stanley C
- * @since 10/31/16.
+ * Created by djacc on 9/26/2016.
  */
-public class VideoFragment extends Fragment implements TextureView.SurfaceTextureListener{
-    private static final String TAG = "VideoFragment";
 
+public class VideoFragment extends Fragment implements TextureView.SurfaceTextureListener, View.OnClickListener,DJIVideoStreamDecoder.IYuvDataListener   {
 
-    public interface VideoListener{
-        void onViewInit();
-    }
-    private VideoListener mListener;
+    private static final String TAG = VideoFragment.class.getName();
+    private VideoFragment.OnFragmentInteractionListenerVideo mListener;
+    protected TextureView mVideo_texture = null;
+    protected SurfaceView mVideo_surface = null;
+    protected SurfaceView mVideo_mysurface = null;
 
-    /**
-     * Default Constructor. DO NOT USE. <br/>
-     * Should only be called by getInstance!
-     */
-    public VideoFragment(){}
+    // Codec for video live view
+    protected DJICodecManager mCodecManager = null;
 
-    /**
-     * Returns instance of VideoFragment. Creates one if an instance does not exist.
-     * @return VideoFragment The single instance.
-     */
-    //Singleton class
+    protected VideoFeeder.VideoDataCallback mReceivedVideoDataCallBack = null;
+    //private DJICamera.CameraReceivedVideoDataCallback mReceivedVideoDataCallback = null;
+
+    //private DJILBAirLink.DJIOnReceivedVideoCallback mOnReceivedVideoCallback = null;
+
+    private BaseProduct mProduct = null;
+    private Camera mCamera = null;
+
     private static VideoFragment mInstance = null;
-    public static VideoFragment getInstance(VideoListener listener){
-        if(mInstance == null){
-            mInstance = new VideoFragment();
-        }
-        mInstance.mListener = listener;
+    public static VideoFragment getInstance(){
         return mInstance;
     }
 
-    //UI
-    protected TextureView mVideoSurface = null;
-    private ImageView mOutputView = null;
+    public VideoFragment() {
+        // Required empty public constructor
+        mInstance=this;
+    }
+    public void appendToFile(String filename, ByteBuffer bbuf)
+    {
+        // Write bbuf to filename
+        //ByteBuffer bbuf = getMyData();
+        File file = new File(filename);
+        boolean append = true;
+        try {
+            // Create a writable file channel
+            FileChannel wChannel = new FileOutputStream(file, append).getChannel();
 
-    //DJI
-    //private DJICamera mCamera;
-    //protected DJICamera.CameraReceivedVideoDataCallback mReceivedVideoDataCallBack = null;
-    protected VideoFeeder.VideoDataCallback mReceivedVideoDataCallBack = null;
-    protected DJICodecManager mCodecManager = null; //Decodes the raw H264 video format
+            // Write the ByteBuffer contents; the bytes between the ByteBuffer's
+            // position and the limit is written to the file
+            wChannel.write(bbuf);
 
-    //Video Processing
-    private Executor mThread = Executors.newSingleThreadExecutor();
-    private final static int NUM_FRAME_SKIP = 30;
-    private int mCounter = 0;
+            // Close the file
+            wChannel.close();
+        } catch (IOException e) {
+        }
+    }
+    private byte[] getDefaultKeyFrame(int width) throws IOException {
+        //int iframeId=getIframeRawId(product.getModel(), width);
+        int iframeId = R.raw.iframe_1280x720_ins;
+        if (iframeId >= 0){
 
-    /*
-     * Fragment startup configuration.
-     * @param savedInstanceState
-     */
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        if(true)return;
-        mReceivedVideoDataCallBack = new VideoFeeder.VideoDataCallback() {
-            @Override
-            public void onReceive(byte[] videoBuffer, int size) {
-                Log.d(TAG, "onResult: Data Received");
-                if(mCodecManager != null){
-                    mCodecManager.sendDataToDecoder(videoBuffer, size);
-                }
-            }
-        };
+            InputStream inputStream = getContext().getResources().openRawResource(iframeId);
+            int length = inputStream.available();
+            //logd("iframeId length=" + length);
+            byte[] buffer = new byte[length];
+            inputStream.read(buffer);
+            inputStream.close();
 
+            return buffer;
+        }
+        return null;
+    }
+    private String videoOutName = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/out.h264";
+    public void createH264(String fileName) {
+        byte[] iframe= new byte[0];
+        try {
+            iframe = getDefaultKeyFrame(0);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String videoOutName = fileName;
+        //udpClient.send(ByteBuffer.wrap(iframe,0,iframe.length));
+
+        File file = new File(videoOutName);
+        file.delete();
+        appendToFile(videoOutName,ByteBuffer.wrap(iframe,0,iframe.length));
     }
 
-    /*
-     * Initialize fragment layout UI
-     * @param inflater
-     * @param container
-     * @param savedInstanceState
-     * @return
-     */
-    @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
         View v = inflater.inflate(R.layout.fragment_video, container, false);
-        mVideoSurface = (TextureView) v.findViewById(R.id.videoTextureView);
-        mOutputView = (ImageView) v.findViewById(R.id.videoImageView);
+
         return v;
     }
 
-    /**
-     * Prepares live video stream on fragment layout
-     */
-    public void initPreviewer(BaseProduct mProduct) {
-        Log.d(TAG, "initPreviewer: ");
-if(true)return;
-
-        setResultToToast(TAG + ": initPreviewer start");
-
-/*        try {
-            mProduct = MainActivity.getProductInstance();
-        }catch (Exception exception) {
-            mProduct = null;
-        }*/
-
-        if (null != mVideoSurface) {
-            mVideoSurface.setSurfaceTextureListener(this);
-        }
-        VideoFeeder.getInstance().getPrimaryVideoFeed().setCallback(mReceivedVideoDataCallBack);
-
-/*        if (null == mProduct || !mProduct.isConnected()) {
-            if(mProduct == null)
-                setResultToToast(TAG + ": Error: mProduct null");
-            else
-                setResultToToast(TAG + ": Error: mProduct not connected");
-
-            mCamera = null;
-        } else {
-            if (!mProduct.getModel().equals(DJIBaseProduct.Model.UnknownAircraft)) {
-                setResultToToast(TAG + ": Get Camera");
-                mCamera = mProduct.getCamera();
-                if (mCamera != null){
-                    setResultToToast(TAG + ": Set Camera callback");
-                    mCamera.setDJICameraReceivedVideoDataCallback(mReceivedVideoDataCallBack);
-                }
-            }
-        }*/
-    }
-
-    /*
-     * Reset live video stream callback
-     */
-    private void uninitPreviewer() {
-/*        if (mCamera != null){
-            // Reset the callback
-            mCamera.setDJICameraReceivedVideoDataCallback(null);
-        }*/
-    }
 
     @Override
-    public void onStart() {
-        super.onStart();
-if(true)return;
-        setResultToToast(TAG + ": onStart");
-        if (mVideoSurface != null) {
-            mVideoSurface.setSurfaceTextureListener(this);
-            setResultToToast(TAG + ": mVideoSurface set");
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        newViewCreated(view);
+
+        try {
+            initVideoCallback();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
+    }
+
+    private void initVideoCallback() throws IOException {
+
+        mReceivedVideoDataCallBack = new VideoFeeder.VideoDataCallback() {
+
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+            @Override
+            public void onReceive( byte[] videoBuffer, int size ) {
+                //TelemetryService.Log("codec onReceive");
+
+                if(origCallback!=null)
+                {
+                    //TelemetryService.Log("codec passthru");
+                    //origCallback.onReceive(videoBuffer,size);
+                }
+                if (mCodecManager != null) {
+                    // Send the raw H264 video data to codec manager for decoding
+                    //TelemetryService.Log("codec onReceive to DJI");
+                    mCodecManager.sendDataToDecoder(videoBuffer, size);
+                }
+
+                boolean useFF = true;
+                if (useFF) {
+                    //TelemetryService.Log("codec onReceive to DJIVideoStreamDecoder");
+                    DJIVideoStreamDecoder.getInstance().parse(videoBuffer, size);
+                }
+
+            }
+        };
+
+
+
     }
 
     @Override
     public void onResume() {
+        TelemetryService.Log("codec onResume");
+//new
+ //createSurfaceListeners();
+//        setVideoCallbacks();
+
         super.onResume();
-if(true)return;
-
-        mListener.onViewInit();
-    }
-
-    /*
-     * Callback function. Called when phone is about to pause/leave the app (user switches screen)
-     */
-    @Override
-    public void onPause() {
-        super.onPause();
-
-        //Save battery. Turn off live video feed.
-        //uninitPreviewer();
-    }
-
-    @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        if (mCodecManager == null) {
-            mCodecManager = new DJICodecManager(getContext(), surface, width, height);
+        if (mVideo_texture == null) {
+            Log.e(TAG, "video texture surface is null");
         }
     }
 
     @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
+    public void onPause() {
+        TelemetryService.Log("codec onPause");
+//        uninitPreviewer();
+        super.onPause();
     }
 
     @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        Log.e(TAG,"onSurfaceTextureDestroyed");
+    public void onDestroy() {
+        TelemetryService.Log("codec onDestroy");
+//        uninitPreviewer();
+        super.onDestroy();
+    }
+
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        try {
+            mListener = (VideoFragment.OnFragmentInteractionListenerVideo) getActivity();
+        } catch (ClassCastException e) {
+            throw new ClassCastException(getActivity().toString() + " must implement OnFragmentInteractionListener");
+        }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+//        uninitPreviewer();
+        mListener = null;
+    }
+
+
+
+    @Override
+    public void onClick(View v) {
+    //mCodecManager = new DJICodecManager(getActivity(), mVideo_texture.getSurfaceTexture(), mVideo_texture.getWidth(), mVideo_texture.getHeight());
+    //setVideoCallbacks();
+    //DJIVideoStreamDecoder.getInstance().changeSurface(null);
+
+    }
+
+
+
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+        TelemetryService.Log("codec onSurfaceTextureAvailable");
+        if (mCodecManager == null) {
+            mCodecManager = new DJICodecManager(getActivity(), surfaceTexture, width, height);
+            setVideoCallbacks();
+
+            //todo: cleanup in destroyed.
+        }
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+        //TelemetryService.Log("codec onSurfaceTextureSizeChanged");
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
+        //TelemetryService.Log("codec onSurfaceTextureDestroyed");
         if (mCodecManager != null) {
             mCodecManager.cleanSurface();
             mCodecManager = null;
@@ -210,54 +261,236 @@ if(true)return;
         return false;
     }
 
-    /*
-     * Called whenever surface texture is updated.
-     * In this context, when the mCodecManager is done decoding the byte stream
-     * and has published the update on the screen.
-     * @param surface
-     */
     @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        Log.w(TAG, "onSurfaceTextureUpdated: Start");
-if(true)return;
+    public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
 
-        //We need to skip people detection occasionally due to it being computationally expensive
-        //Check counter
-        if(mCounter < NUM_FRAME_SKIP){
-            //Skip frame
-            mCounter ++;
+    }
+
+
+    public interface OnFragmentInteractionListenerVideo {
+        public void onFragmentInteractionVideo(boolean bl_OnTopJustClicked);
+    }
+
+
+/////////////////////////////////////////////////////////////////
+
+    private SurfaceView videostreamPreviewSf;
+
+    private View myView=null;
+    private void newViewCreated(View view)
+    {
+        //todo factor this out.
+        mVideo_texture = (TextureView) view.findViewById(R.id.livestream_preview_ttv);
+        TelemetryService.Log("codec newViewCreated!!!!!!!!!!!!!");
+        myView=view;
+        //videostreamPreviewSf = (SurfaceView) view.findViewById(R.id.mypreview);
+    }
+
+
+    private boolean listenerInstalled=false;
+    public void notifyProductUpdate()
+    {
+        TelemetryService.Log("codec notifyProductUpdate");
+
+        if(VideoFeeder.getInstance()==null || VideoFeeder.getInstance().getPrimaryVideoFeed()==null)
+        {
+            TelemetryService.Log("codec notifyProductUpdate Camera unavalible");
             return;
-        } else{
-            //Reset counter
-            mCounter = 0;
         }
 
-        /*
-         * Use OpenCV to detect any people in the video feed.
-         * If anyone is detected, display a bounding box around the person.
-         */
-        final Bitmap image = mVideoSurface.getBitmap();
+        if(myView!=null) {
+            TelemetryService.Log("codec myView "+listenerInstalled);
 
-        // Perform image processing here
+            if(myView==null)
+                mVideo_texture = (TextureView) myView.findViewById(R.id.livestream_preview_ttv);
 
-        Log.w(TAG, "onSurfaceTextureUpdated: Start Output Bitamp");
-        //Push to bitmap and update
+            if (mVideo_texture!=null && !listenerInstalled) {
+                TelemetryService.Log("codec notifyProductUpdate setSurfaceTextureListener");
+                mVideo_texture.setSurfaceTextureListener(this);
+                listenerInstalled=true;
+            }
+            if (mCodecManager == null) {
+                TelemetryService.Log("codec notifyProductUpdate new DJICodecManager");
 
-        //Bitmap output2 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-//        Utils.matToBitmap(rawOutput, output);
-//        mOutputView.setImageBitmap(output);
+                //force init at start.
+                mCodecManager = new DJICodecManager(getActivity(), mVideo_texture.getSurfaceTexture(), mVideo_texture.getWidth(), mVideo_texture.getHeight());
+                setVideoCallbacks();
+            }
+
+        }
+        //for other codec.
+        createSurfaceListeners();
     }
+    private VideoFeeder.VideoDataCallback origCallback = null;
+    private void setVideoCallbacks() {
+        if(VideoFeeder.getInstance()!=null && VideoFeeder.getInstance().getPrimaryVideoFeed()!=null) {
+            VideoFeeder.VideoDataCallback curCallback = VideoFeeder.getInstance().getPrimaryVideoFeed().getCallback();
+            if ((curCallback == null) || (curCallback != mReceivedVideoDataCallBack)) {
+                TelemetryService.Log("codec setVideoCallbacks");
+                if(origCallback==null)
+                    TelemetryService.Log("codec origCallback is NULL");
+                origCallback=curCallback;
+                VideoFeeder.getInstance().getPrimaryVideoFeed().setCallback(mReceivedVideoDataCallBack);
+//            createH264(videoOutName);
+            }
+        }
+//        mProduct = DjiApplication.getProductInstance();
+//        mCamera = mProduct.getCamera();
+//        if (mCamera != null) {
+//            mCamera.setDJICameraReceivedVideoDataCallback(mReceivedVideoDataCallback);
+//        }
+    }
+    boolean surfaceReady=false;
+    private void createSurfaceListeners() {
+        if(surfaceReady)
+            return;
+        surfaceReady=true;
+        TelemetryService.Log("codec createSurfaceListeners()");
 
-    /*
-     * Push messages to the device screen
-     * @param string
-     */
-    private void setResultToToast(final String string){
-        getActivity().runOnUiThread(new Runnable() {
+        videostreamPreviewSf = (SurfaceView) myView.findViewById(R.id.mypreview);
+        SurfaceHolder videostreamPreviewSh = videostreamPreviewSf.getHolder();
+        videostreamPreviewSh.addCallback(new SurfaceHolder.Callback() {
             @Override
-            public void run() {
-                Toast.makeText(getActivity(), string, Toast.LENGTH_SHORT).show();
+            public void surfaceCreated(SurfaceHolder holder) {
+
+                TelemetryService.Log("codec surfaceCreated");
+                NativeHelper.getInstance().init();
+                DJIVideoStreamDecoder.getInstance().init(getContext(), videostreamPreviewSh.getSurface());
+                DJIVideoStreamDecoder.getInstance().setYuvDataListener(VideoFragment.this);
+DJIVideoStreamDecoder.getInstance().changeSurface(null);
+
+                DJIVideoStreamDecoder.getInstance().resume();
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                TelemetryService.Log("codec surfaceChanged");
+                DJIVideoStreamDecoder.getInstance().changeSurface(holder.getSurface());
+//       DJIVideoStreamDecoder.getInstance().changeSurface(null);
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                TelemetryService.Log("codec surfaceDestroyed");
+                DJIVideoStreamDecoder.getInstance().stop();
+                DJIVideoStreamDecoder.getInstance().destroy();
+                NativeHelper.getInstance().release();
             }
         });
+//force start on init.
+        DJIVideoStreamDecoder.getInstance().init(getContext(), videostreamPreviewSh.getSurface());
+        DJIVideoStreamDecoder.getInstance().setYuvDataListener(VideoFragment.this);
+DJIVideoStreamDecoder.getInstance().changeSurface(null);
+        DJIVideoStreamDecoder.getInstance().resume();
     }
+
+
+    private int screenShotInterval = 30;
+    @Override
+    public void onYuvDataReceived(byte[] yuvFrame, int width, int height) {
+//        TelemetryService.Log("codec onYuvDataReceived");
+        //In this demo, we test the YUV data by saving it into JPG files.
+        if (screenShotInterval> 0 && (DJIVideoStreamDecoder.getInstance().frameIndex % screenShotInterval == 0)) {
+            byte[] y = new byte[width * height];
+            byte[] u = new byte[width * height / 4];
+            byte[] v = new byte[width * height / 4];
+            byte[] nu = new byte[width * height / 4]; //
+            byte[] nv = new byte[width * height / 4];
+            System.arraycopy(yuvFrame, 0, y, 0, y.length);
+            for (int i = 0; i < u.length; i++) {
+                v[i] = yuvFrame[y.length + 2 * i];
+                u[i] = yuvFrame[y.length + 2 * i + 1];
+            }
+            int uvWidth = width / 2;
+            int uvHeight = height / 2;
+            for (int j = 0; j < uvWidth / 2; j++) {
+                for (int i = 0; i < uvHeight / 2; i++) {
+                    byte uSample1 = u[i * uvWidth + j];
+                    byte uSample2 = u[i * uvWidth + j + uvWidth / 2];
+                    byte vSample1 = v[(i + uvHeight / 2) * uvWidth + j];
+                    byte vSample2 = v[(i + uvHeight / 2) * uvWidth + j + uvWidth / 2];
+                    nu[2 * (i * uvWidth + j)] = uSample1;
+                    nu[2 * (i * uvWidth + j) + 1] = uSample1;
+                    nu[2 * (i * uvWidth + j) + uvWidth] = uSample2;
+                    nu[2 * (i * uvWidth + j) + 1 + uvWidth] = uSample2;
+                    nv[2 * (i * uvWidth + j)] = vSample1;
+                    nv[2 * (i * uvWidth + j) + 1] = vSample1;
+                    nv[2 * (i * uvWidth + j) + uvWidth] = vSample2;
+                    nv[2 * (i * uvWidth + j) + 1 + uvWidth] = vSample2;
+                }
+            }
+            //nv21test
+            byte[] bytes = new byte[yuvFrame.length];
+            System.arraycopy(y, 0, bytes, 0, y.length);
+            for (int i = 0; i < u.length; i++) {
+                bytes[y.length + (i * 2)] = nv[i];
+                bytes[y.length + (i * 2) + 1] = nu[i];
+            }
+            Log.d(TAG,
+                    "onYuvDataReceived: frame index: "
+                            + DJIVideoStreamDecoder.getInstance().frameIndex
+                            + ",array length: "
+                            + bytes.length);
+            screenShot(bytes);
+        }
+    }
+
+    /**
+     * Save the buffered data into a JPG image file
+     */
+
+    private void screenShot(byte[] buf) {
+
+        //todo. Get timestamp from when image was taken instead of saved.
+        String timestamp=new SimpleDateFormat("yyyyMMdd_HHmmss_SSS").format(new Date());
+        String shotDir = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/screens/";
+        final String path =shotDir + "/"+ timestamp  + ".jpg";
+        String remotePath="/screens/"+ timestamp  + ".jpg";//web relative path used for log message
+
+        File dir = new File(shotDir);
+        if (!dir.exists() || !dir.isDirectory()) {
+            dir.mkdirs();
+        }
+        YuvImage yuvImage = new YuvImage(buf,
+                ImageFormat.NV21,
+                DJIVideoStreamDecoder.getInstance().width,
+                DJIVideoStreamDecoder.getInstance().height,
+                null);
+        OutputStream outputFile;
+        //final String path = dir + "/ScreenShot_" + System.currentTimeMillis() + ".jpg";
+
+        try {
+            outputFile = new FileOutputStream(new File(path));
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "test screenShot: new bitmap output file error: " + e);
+            return;
+        }
+        if (outputFile != null) {
+            yuvImage.compressToJpeg(new Rect(0,
+                    0,
+                    DJIVideoStreamDecoder.getInstance().width,
+                    DJIVideoStreamDecoder.getInstance().height), 90, outputFile);
+        }
+        try {
+            outputFile.close();
+        } catch (IOException e) {
+            Log.e(TAG, "test screenShot: compress yuv image error: " + e);
+            e.printStackTrace();
+            return;
+        }
+
+        TelemetryService.Log("P:screenshot "+remotePath);
+
+        //runOnUiThread(new Runnable() {
+        //    @Override
+        //    public void run() {
+        //        displayPath(path);
+        //    }
+        //});
+    }
+
+
+
+
+
 }

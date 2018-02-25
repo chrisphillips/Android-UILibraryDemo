@@ -5,6 +5,7 @@
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script type="text/javascript" src="https://cesiumjs.org/Cesium/Build/Cesium/Cesium.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <link rel="stylesheet" type="text/css" href="https://cesiumjs.org/Cesium/Build/Cesium/Widgets/widgets.css">
   <style type="text/css">
           html, #cesiumContainer {
@@ -22,14 +23,82 @@
 
 <script type='text/javascript'>//<![CDATA[
 window.onload=function(){
-var viewer = new Cesium.Viewer('cesiumContainer');
+var viewer = new Cesium.Viewer('cesiumContainer',{
+//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
+});
 window.viewer=viewer;
+var camera = viewer.scene.camera;
+
+viewer.scene.preRender.addEventListener(function() {
+return;
+	//lock north
+    camera.setView({
+        orientation: {
+            heading: 0,
+            pitch: camera.pitch,
+            roll: camera.roll
+        }
+    });
+});
+
+/*viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
+    url : 'https://assets.agi.com/stk-terrain/world',
+    requestWaterMask : true, // required for water effects
+    requestVertexNormals : true // required for terrain lighting
+});*/
 
 
+ //viewer.scene.morphToColumbusView();
     /*viewer.camera.flyTo({
         destination : Cesium.Cartesian3.fromDegrees(-117.16, 32.71, 15000.0)
     });*/
+	
+	var position = Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, 5.0);
+    var heading = Cesium.Math.toRadians(135);
+    var pitch = 0;
+    var roll = 0;
+    var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+    var orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+
+    var entity = viewer.entities.add({
+        name : 'mavic.glb',
+        position : position,
+        orientation : orientation,
+        model : {
+            uri :  '/Cesium_Air.glb',
+            minimumPixelSize : 1280,
+            maximumScale : 20000,
+			scale : 10.0
+        }
+    });
+    viewer.trackedEntity = entity;
+	
+	
 };
+
+function createModel(url, height) {
+    viewer.entities.removeAll();
+
+    var position = Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, height);
+    var heading = Cesium.Math.toRadians(135);
+    var pitch = 0;
+    var roll = 0;
+    var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+    var orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+
+    var entity = viewer.entities.add({
+        name : url,
+        position : position,
+        orientation : orientation,
+        model : {
+            uri : url,
+            minimumPixelSize : 128,
+            maximumScale : 20000
+        }
+    });
+    viewer.trackedEntity = entity;
+}
+//createModel('/mavic.glb', 5000.0);
 </script>
 
   
@@ -43,15 +112,39 @@ window.viewer=viewer;
 			   position:absolute;
 			   bottom:30px;
 			   right:10px;
-                  width: 25%;
-                  height: 40%;
+                  width: 22%;
+                  height: 50%;
                   margin: 0 auto;
                   background: #333232bd;
-				color:lightcyan;
+			    color:lightcyan;
                   border-radius: 10px;
                   border-top: 1px solid #fff;
                   padding-bottom: 16px;
                }
+               #status-panel {
+                  position:absolute;
+                  width:30%;
+                  height:95%;
+                  top:30px;
+                  left:10px;
+                  background: #333232bd;
+				color:lightcyan;
+                  border-radius: 10px;
+                  border-top: 1px solid #fff;
+				  overflow:auto;
+               }		
+               #status-panel table {
+			   width:100%;
+			   height:100%;
+			   }
+               .preview {
+                  position:absolute;
+                  width:640px;
+                  height:360px;
+                  top:20px;
+                  right:20px;
+				  background:blue;
+               }			   
                #chat { width: 97%; }
                .message { font-weight: bold; }
                .message:before { content: ' '; color: #bbb; font-size: 14px; }
@@ -104,14 +197,14 @@ window.viewer=viewer;
                #status.online {
                   background: #0c0;
                }
-               .preview {
-                  position:absolute;
-                  width:640px;
-                  height:360px;
-                  top:20px;
-                  left:20px;
-				  background:blue;
-               }
+
+              .cesium-viewer-bottom,  .cesium-viewer-animationContainer, .cesium-viewer-timelineContainer{
+                  display: none;
+               }		
+              .cesium-viewer-toolbar{
+                  z-index: 2;
+               }					   
+
             </style>
 				
             <article>
@@ -146,8 +239,8 @@ window.viewer=viewer;
 					
                function doConnect() {
 			   //var ip = "ws://"+ window.location.host+":3001";
-                  var wsUri = "ws://"+ window.location.hostname+":3001";
- //                 var wsUri = "ws://192.168.1.8:3001";
+ //                 var wsUri = "ws://"+ window.location.hostname+":3001";
+                  var wsUri = "ws://192.168.1.8:3001";
                   websocket = new WebSocket(wsUri);
                   websocket.onopen = function(evt) { onOpen(evt) };
                   websocket.onclose = function(evt) { onClose(evt) };
@@ -169,7 +262,61 @@ window.viewer=viewer;
 			
 			
                function onMessage(evt) {
+			     var str = evt.data.substring(22)
+				 if(str.startsWith("GET:") || str.startsWith("PSH:"))
+				 {
+					var exp = str.substring(4);
+					var parts=exp.split("=");
+					var controllerName = parts[0].split(".")[0];
+					var keyName = parts[0].split(".")[1];
+					var keyValue = parts[1];
+					var e = $('*[data-id="'+controllerName+'-'+keyName+'"]')
+					if( e.length==0)
+					{
+						$("table#telemetry").append("<tr data-id="+controllerName+"-"+keyName+"><td>"+controllerName+"."+keyName+"</td><td>"+keyValue+"</td></tr>");
+					}else
+						e.find("td").eq(1).html(keyValue); 
+					
+					return;//dont display in log.
+				 }
+				//add to log window.
+				 log.innerHTML = log.innerHTML+'<li class = "message">' + 
+					evt.data.substring(9) + "</li>" ;//note substring cuts off date part of timestamp for brevity.
+				log.scrollTop = log.scrollHeight;
+return;
 
+				var msg = evt.data.split(" ")[2];
+				
+				if(msg.indexOf(":")>0)//system message?
+				{
+					var parts =msg.split(":");
+					var system = parts[0];
+					
+					parts =  parts[1].split("=");
+					var name = parts[0];
+					var value = parts[1];
+					var e =$("#"+system+"-"+name);
+					if(e.length==0)
+					{
+						$("table#telemetry").append("<tr id="+system+"-"+name+"><td>"+name+"</td><td>"+value+"</td></tr>");
+					}else
+					{
+						e.find("td").eq(1).html(value); 
+						//e.text(name+"="+value);
+					}
+					if(system==="P" && name=="Location")
+					{
+						if(!window.startLocation){
+							//console.log(parts)
+							var loc = value.split(",");
+							viewer.camera.flyTo({
+								destination : Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),1000.0)
+							});
+							window.startLocation=true
+						}
+						return;//dont display heatbeat in log.					
+					}
+				}
 				if(evt.data.indexOf("P:")>0)//message from pc?
 				{
 					var parts = evt.data.split("P:")[1].split(" ")
@@ -222,7 +369,8 @@ window.viewer=viewer;
 					
             </script>
          </section>
-		   <img id="preview" class="preview" src="">
+		   <img id="preview" class="preview" src="/images/TestPattern.jpg">
+		   <div id="status-panel"><table id="telemetry" ></table></div>
 <img>
 </body>
 </html>

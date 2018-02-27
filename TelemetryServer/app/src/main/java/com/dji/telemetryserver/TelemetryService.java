@@ -9,6 +9,7 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.koushikdutta.async.callback.CompletedCallback;
+import com.koushikdutta.async.http.Headers;
 import com.koushikdutta.async.http.WebSocket;
 import com.koushikdutta.async.http.server.AsyncHttpServer;
 import com.koushikdutta.async.http.server.AsyncHttpServerRequest;
@@ -39,19 +40,26 @@ import dji.sdk.sdkmanager.DJISDKManager;
 
 public class TelemetryService {
 
-    public Context context;
     private static TelemetryService instance=null;
     public static TelemetryService getInstance()
     {
         return instance;
     }
 
+
+
     public static void Log(String message)
     {
         if(instance!=null)
-            instance.log(message);
-    }
+            instance._log(message);
 
+    }
+    public static void LogDebug(String message)
+    {
+        if(instance!=null)
+            instance._log(message);
+
+    }
     //These are the keys that will be logged in the Remote group.
     public String[] remoteControllerListenKeys = {
             RemoteControllerKey.DISPLAY_NAME,
@@ -129,7 +137,19 @@ public class TelemetryService {
     {
         return new SimpleDateFormat("yy-MM-dd HH:mm:ss.SSS ").format(new Date());
     }
-    public void log(String message)
+    private String outputBuffer="";
+    private void flushOutputBuffer()
+    {
+        for(WebSocket socket : webSockets)
+        {
+            if(outputBuffer.length()>0)
+            {
+                socket.send(outputBuffer);
+                outputBuffer="";
+            }
+        }
+    }
+    private void _log(String message)
     {
         //add timestamp.
         String timeStamp = getTimeStamp();
@@ -140,9 +160,10 @@ public class TelemetryService {
             appendToFile(logPath,message+"\r\n");
 
         //broadcast to connected websockets
-        for(WebSocket socket : webSockets)
+        outputBuffer+=message+"|";
+        if(outputBuffer.length()>1024)
         {
-            socket.send(message);
+            flushOutputBuffer();
         }
 
         //broadcast via udp.
@@ -166,7 +187,9 @@ public class TelemetryService {
                     //save connection for future messages.
                     webSockets.add(webSocket);
                     //log("Log Connected.");
-                    webSocket.send( getTimeStamp()+"Client connected.");
+                    TelemetryService.LogDebug("Client connected.");
+DJIKeyedInterface.doGetAll();
+DJIKeyedInterface.startListeners();
 
                     //Cleanup socket on close.
                     webSocket.setClosedCallback(new CompletedCallback() {
@@ -197,7 +220,7 @@ public class TelemetryService {
         httpServer.get("/screens/.*", new HttpServerRequestCallback() {
             @Override
             public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
-                AssetManager am =context.getAssets();
+                AssetManager am =DemoApplication.getContext().getAssets();
                 try {
                     String path = Environment.getExternalStorageDirectory() + "/DJI_Telemetry"+request.getPath();
                     InputStream ins =new FileInputStream(path);
@@ -214,12 +237,32 @@ public class TelemetryService {
                 //response.s
             }
         });
+        //web serve screenshots.
+        httpServer.get("/logs/.*", new HttpServerRequestCallback() {
+            @Override
+            public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
+                AssetManager am =DemoApplication.getContext().getAssets();
+                try {
+                    String path = Environment.getExternalStorageDirectory() + "/DJI_Telemetry"+request.getPath();
+                    InputStream ins =new FileInputStream(path);
+                    byte[] bytes = new byte[ins.available()];
+                    ins.read(bytes);
+                    ins.close();
+                    response.send("text/html; charset=utf-8",bytes);
+                } catch (IOException e) {
+                    response.code(404);
+                    response.send("");
+                    e.printStackTrace();
+                }
 
+                //response.s
+            }
+        });
         //web serve html files.
         httpServer.get("/.*", new HttpServerRequestCallback() {
             @Override
             public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
-                AssetManager am =context.getAssets();
+                AssetManager am =DemoApplication.getContext().getAssets();
                 try {
                     String path = request.getPath();
                     if(path.equals("/"))
@@ -231,22 +274,57 @@ public class TelemetryService {
                     byte[] bytes = new byte[ins.available()];
                     ins.read(bytes);
                     ins.close();
+
+/*                    response.getHeaders().set("Access-Control-Allow-Methods", "POST, GET, DELETE, PUT, OPTIONS");
+                    response.getHeaders().set("Access-Control-Allow-Origin", "*");
+                    response.getHeaders().set("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
+*/
+                    setResponseHeaders(request, response);
+
+                    if(path.endsWith(".jpg"))
+                        response.send("image/jpeg",bytes);
+                    else if(path.endsWith(".glb"))
+                        response.send("application/octet-stream",bytes);
+                    else
                     response.send("text/html; charset=utf-8",bytes);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             //todo handle 404 etc.
-                //response.s
+                response.code(404);
+                response.send("");
             }
         });
+        httpServer.addAction("OPTIONS",".+", new HttpServerRequestCallback() {
+            @Override
+            public void onRequest(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
 
+                setResponseHeaders(request, response);
+                response.send("ok");
+            }
+        });
         httpServer.listen(5001);
     }
+    void setResponseHeaders(AsyncHttpServerRequest request, AsyncHttpServerResponse response) {
+        Headers allHeaders = response.getHeaders();
+        Headers reqHeaders = request.getHeaders();
+
+        String corsHeaders = reqHeaders.get("access-control-request-headers");
+
+        if(corsHeaders!=null) {
+            // common headers
+            allHeaders.set("Access-Control-Allow-Origin", "*");
+            allHeaders.set("Access-Control-Allow-Credentials", "true");
+            allHeaders.set("Access-Control-Allow-Headers", corsHeaders);
+            allHeaders.set("Access-Control-Allow-Methods", "HEAD,OPTIONS,GET,POST,PUT,PATCH,DELETE,CONNECT");
+            allHeaders.set("Access-Control-Max-Age", "86400");
+        }
+    }
     //Start the services on construction.
-    public TelemetryService(Context context)
+    public TelemetryService()
     {
         instance=this;
-        this.context=context;
+        //this.context=context;
         //create log dir if needed.
         String logDir = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/logs/";
         new File(logDir).mkdirs();
@@ -254,7 +332,7 @@ public class TelemetryService {
         //set output log file name.
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         logPath = logDir + "Log_" + timeStamp + ".txt";
-        log("Logging started "+logPath);
+        Log("Debug.message=Logging started "+logPath);
 
         Handler handler = new Handler();
         int delay = 1000; //milliseconds
@@ -266,10 +344,11 @@ public class TelemetryService {
                    Location loc = MainActivity.getCurrentLocation();
                    if (loc != null) {
                        //hack. send phone loc as heat beat. probably better way to do this.
-                       log("P:location " + String.valueOf(loc.getLatitude()) + " " +
-                               String.valueOf(loc.getLongitude()) + " " +
+                       Log("PSH:Phone.Location=" + String.valueOf(loc.getLatitude()) + "," +
+                               String.valueOf(loc.getLongitude()) + "," +
                                String.valueOf(loc.getBearing())
                        );
+                       flushOutputBuffer();
                    }
                    handler.postDelayed(this, delay);
                }catch(Exception e)
@@ -283,12 +362,15 @@ public class TelemetryService {
         createWebserver();
 
         //Start all the key listners.
-//        startListeners();
+        //startListeners();
     }
+
+
 
     //Start all the SDK Key listners.
     public void startListeners() {
-        log("Starting listners");
+        TelemetryService.Log("Starting listners");
+
         if(DJISDKManager.getInstance()==null || DJISDKManager.getInstance().getKeyManager()==null )
             return;//not ready yet.
 
@@ -301,13 +383,13 @@ public class TelemetryService {
 
             //Do an initial get of the keys value.
             // TODO. This should probably be done in a separately. You might not always want to get an inital.
-            log(keyName+":"+DJIValueToString(keyManager.getValue(djikey)));
+//            log(keyName+"="+DJIValueToString(keyManager.getValue(djikey)));
 
             DJISDKManager.getInstance().getKeyManager().addListener(djikey, new KeyListener() {
                 @Override public void onValueChange(@Nullable Object oldValue, @Nullable Object newValue) {
                     //Format the change message
-                    String message = keyName+":"+DJIValueToString(newValue);
-                    log(message);//send
+                    String message = keyName+"="+DJIValueToString(newValue);
+                    TelemetryService.Log(message);//send
                 }
             });
         }
@@ -316,12 +398,12 @@ public class TelemetryService {
         for (String key: flightControllerListenKey) {
             DJIKey djikey = FlightControllerKey.create(key);
             String keyName = "F:"+key;
-            log(keyName+":"+DJIValueToString(keyManager.getValue(djikey)));
+//            log(keyName+"="+DJIValueToString(keyManager.getValue(djikey)));
 
             DJISDKManager.getInstance().getKeyManager().addListener(djikey, new KeyListener() {
                 @Override public void onValueChange(@Nullable Object oldValue, @Nullable Object newValue) {
-                    String message = keyName+":"+DJIValueToString(newValue);
-                    log(message);
+                    String message = keyName+"="+DJIValueToString(newValue);
+                    TelemetryService.Log(message);
                 }
             });
         }
@@ -339,7 +421,7 @@ public class TelemetryService {
             return String.valueOf(((ChargeRemaining)value).getRemainingChargeInPercent());
         }else if (value instanceof Stick) {
             Stick stick = (Stick)value;
-            String msg = "x:"+stick.getHorizontalPosition()+",y:"+stick.getVerticalPosition();
+            String msg = ""+stick.getHorizontalPosition()+","+stick.getVerticalPosition();
             return msg;
         }else if (value instanceof HardwareState.Button) {
             HardwareState.Button button = (HardwareState.Button)value;

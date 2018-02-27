@@ -29,24 +29,17 @@ public class DemoApplication extends Application {
     private BaseProduct.BaseProductListener mDJIBaseProductListener;
     private BaseComponent.ComponentListener mDJIComponentListener;
 
-    //servers and logging.
-    TelemetryService telemetryService;
-
-    private Application instance;
-    public void setContext(Application application) {
+    private static Application instance;
+    public static void setContext(Application application) {
         instance = application;
     }
-
+    public static Application getContext(){
+        return instance;
+    }
     @Override
     public Context getApplicationContext() {
         return instance;
     }
-    private static Context _mContext;
-
-    public static Context getContext(){
-        return _mContext;
-    }
-
     public DemoApplication() {
 
     }
@@ -62,12 +55,15 @@ public class DemoApplication extends Application {
         return mProduct;
     }
 
+    public TelemetryService telemetryService;
     @Override
     public void onCreate() {
         super.onCreate();
-        _mContext = this;//for static context
 
         mHandler = new Handler(Looper.getMainLooper());
+
+        //Todo. make this class static?
+        telemetryService = new TelemetryService();
 
 
 
@@ -81,7 +77,6 @@ public class DemoApplication extends Application {
             @Override
             public void onRegister(DJIError error) {
                 if(error == DJISDKError.REGISTRATION_SUCCESS) {
-                    telemetryService = new TelemetryService(getApplicationContext());
                     DJISDKManager.getInstance().startConnectionToProduct();
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -94,7 +89,9 @@ public class DemoApplication extends Application {
                     //loginAccount();
 
                     //start listening to SDK keys for logging.
-                    TelemetryService.getInstance().startListeners();
+                    //TelemetryService.getInstance().startListeners();
+
+                    notifyStatusChange();
 
                 } else {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -129,7 +126,7 @@ public class DemoApplication extends Application {
             @Override
             public void onComponentChange(BaseProduct.ComponentKey key, BaseComponent oldComponent, BaseComponent newComponent) {
 
-                telemetryService.log("mDJIBaseProductListener onComponentChange "+key);
+                TelemetryService.LogDebug("mDJIBaseProductListener onComponentChange "+key);
                 Toast.makeText(getApplicationContext(), "onComponentChange "+key, Toast.LENGTH_LONG).show();
                 if(newComponent != null) {
                     newComponent.setComponentListener(mDJIComponentListener);
@@ -148,7 +145,7 @@ VideoFragment.getInstance().notifyProductUpdate();
 
             @Override
             public void onConnectivityChange(boolean isConnected) {
-                telemetryService.log("mDJIBaseProductListener onConnectivityChange "+isConnected);
+                TelemetryService.LogDebug("mDJIBaseProductListener onConnectivityChange "+isConnected);
                 Toast.makeText(getApplicationContext(), "mDJIBaseProductListener onConnectivityChange", Toast.LENGTH_LONG).show();
 
                 notifyStatusChange();
@@ -160,8 +157,14 @@ VideoFragment.getInstance().notifyProductUpdate();
 
             @Override
             public void onConnectivityChange(boolean isConnected) {
-                telemetryService.log("mDJIComponentListener onConnectivityChange "+isConnected);
+                TelemetryService.LogDebug("mDJIComponentListener onConnectivityChange "+isConnected);
                 Toast.makeText(getApplicationContext(), "XXXXXX mDJIComponentListener onConnectivityChange", Toast.LENGTH_LONG).show();
+if(isConnected) {
+//    DJIKeyedInterface.startListeners();
+
+//    TelemetryService.getInstance().startListeners();
+//    DJIKeyedInterface.startListeners();
+}
 
                 notifyStatusChange();
             }
@@ -195,6 +198,9 @@ VideoFragment.getInstance().notifyProductUpdate();
     }
 
     private void notifyStatusChange() {
+//DJIKeyedInterface.doGetAll();
+//DJIKeyedInterface.startListeners();
+//TelemetryService.getInstance().startListeners();
 
         mHandler.removeCallbacks(updateRunnable);
         mHandler.postDelayed(updateRunnable, 500);

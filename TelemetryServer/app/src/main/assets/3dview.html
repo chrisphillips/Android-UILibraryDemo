@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -17,361 +16,407 @@
           overflow: hidden;
           height: 100%;
       }
-  </style>
+	  ul{
+		padding-left:20px;
+	  }
 
+	   #wrapper {
+	   position:absolute;
+	   bottom:30px;
+	   top:40px;
+	   right:10px;
+		  width: 22%;
+		  margin: 0 auto;
+		  background: #333232bd;
+		color:lightcyan;
+		  border-radius: 10px;
+		  border-top: 1px solid #fff;
+	   }
+	   #status-panel {
+//		  position:absolute;
+		  width:100%;
+		  height:70%;
+		 // top:30px;
+		 // left:10px;
+		  background: #333232bd;
+		color:lightcyan;
+		  border-radius: 10px;
+		  border-top: 1px solid #fff;
+		  overflow:auto;
+	   }		
+	   #status-panel table {
+		   width:100%;
+		   height:100%;
+	   }
+	   #telemetry
+	   {
+	   		  list-style: none;
+			  padding-left:0px;
+	   }
+	   #telemetry .value
+	   {
+	   		  text-align: right;
+			  color:white;
+	   }	   
+	   #log-panel {
+		  height: 25%;
+		  padding-left: 4px;
+		  overflow-y:auto;
+		  overflow-x:hidden
+	   }
+	   #log {
+		  list-style: none;
+		  width: 100%;
+		  height:100%;
+		  padding-left: 0px;
+	   }
+	   #log li {
+		  margin: 0;
+	   }
+	   #chat { width: 97%; }
+	   .message { font-weight: bold; }
+	   .message:before { content: ' '; color: #bbb; font-size: 14px; }
+
+	   .preview {
+		  position:absolute;
+		  width:640px;
+		  height:360px;
+		  top:20px;
+		  left:20px;
+		  background:blue;
+	   }			   
+
+			
+	   body {
+		  font: normal 12px/14px "Helvetica Neue", Helvetica, sans-serif;
+		  background: rgb(237, 237, 236);
+		  margin: 0;
+	//                  margin-top: 40px;
+		  padding: 0;
+	   }
+	   section, header {
+		  display: block;
+	   }
+
+	   h1 {
+	//                  padding-top: 10px;
+	   }
+	   h2 {
+		  font-size: 100%;
+		  font-style: italic;
+	   }
+	  article  {
+		  height: 100%;
+	   }
+	   .panel-header {
+		  padding: 2px;
+		  color: #fff;
+  		  border-radius: 2px;
+		  width=100%;
+	   }
+	   #status {
+		  padding: 5px;
+		  color: #fff;
+		  background: #ccc;
+  		  border-radius: 10px;
+	   }
+	   #status.fail {
+		  background: #c00;
+	   }
+	   #status.success {
+		  background: #0c0;
+	   }
+	   #status.offline {
+		  background: #c00;
+	   }
+	   #status.online {
+		  background: #0c0;
+	   }
+	  .cesium-viewer-bottom,  .cesium-viewer-animationContainer, .cesium-viewer-timelineContainer{
+		  display: none;
+	   }		
+	  .cesium-viewer-toolbar{
+		  z-index: 2;
+	   }					   
+	</style>
   <title>Telemetry</title>
-
-<script type='text/javascript'>//<![CDATA[
-window.onload=function(){
-var viewer = new Cesium.Viewer('cesiumContainer',{
-//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
-});
-window.viewer=viewer;
-var camera = viewer.scene.camera;
-
-viewer.scene.preRender.addEventListener(function() {
-return;
-	//lock north
-    camera.setView({
-        orientation: {
-            heading: 0,
-            pitch: camera.pitch,
-            roll: camera.roll
-        }
-    });
-});
-
-/*viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
-    url : 'https://assets.agi.com/stk-terrain/world',
-    requestWaterMask : true, // required for water effects
-    requestVertexNormals : true // required for terrain lighting
-});*/
-
-
- //viewer.scene.morphToColumbusView();
-    /*viewer.camera.flyTo({
-        destination : Cesium.Cartesian3.fromDegrees(-117.16, 32.71, 15000.0)
-    });*/
-	
-	var position = Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, 5.0);
-    var heading = Cesium.Math.toRadians(135);
-    var pitch = 0;
-    var roll = 0;
-    var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
-    var orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
-
-    var entity = viewer.entities.add({
-        name : 'mavic.glb',
-        position : position,
-        orientation : orientation,
-        model : {
-            uri :  '/Cesium_Air.glb',
-            minimumPixelSize : 1280,
-            maximumScale : 20000,
-			scale : 10.0
-        }
-    });
-    viewer.trackedEntity = entity;
-	
-	
-};
-
-function createModel(url, height) {
-    viewer.entities.removeAll();
-
-    var position = Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, height);
-    var heading = Cesium.Math.toRadians(135);
-    var pitch = 0;
-    var roll = 0;
-    var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
-    var orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
-
-    var entity = viewer.entities.add({
-        name : url,
-        position : position,
-        orientation : orientation,
-        model : {
-            uri : url,
-            minimumPixelSize : 128,
-            maximumScale : 20000
-        }
-    });
-    viewer.trackedEntity = entity;
-}
-//createModel('/mavic.glb', 5000.0);
-</script>
-
-  
 </head>
 
 <body>
-  <div id="cesiumContainer"></div>
-<section id = "wrapper">
-            <style>
-               #wrapper {
-			   position:absolute;
-			   bottom:30px;
-			   right:10px;
-                  width: 22%;
-                  height: 50%;
-                  margin: 0 auto;
-                  background: #333232bd;
-			    color:lightcyan;
-                  border-radius: 10px;
-                  border-top: 1px solid #fff;
-                  padding-bottom: 16px;
-               }
-               #status-panel {
-                  position:absolute;
-                  width:30%;
-                  height:95%;
-                  top:30px;
-                  left:10px;
-                  background: #333232bd;
-				color:lightcyan;
-                  border-radius: 10px;
-                  border-top: 1px solid #fff;
-				  overflow:auto;
-               }		
-               #status-panel table {
-			   width:100%;
-			   height:100%;
-			   }
-               .preview {
-                  position:absolute;
-                  width:640px;
-                  height:360px;
-                  top:20px;
-                  right:20px;
-				  background:blue;
-               }			   
-               #chat { width: 97%; }
-               .message { font-weight: bold; }
-               .message:before { content: ' '; color: #bbb; font-size: 14px; }
-               #log {
-                  overflow: auto;
-                  height: 92%;
-                  list-style: none;
-                  padding-left: 4px;
-               }
-               #log li {
-                  margin: 0;
-//                  padding: 10px 0;
-               }
-					
-               body {
-                  font: normal 12px/14px "Helvetica Neue", Helvetica, sans-serif;
-                  background: rgb(237, 237, 236);
-                  margin: 0;
-//                  margin-top: 40px;
-                  padding: 0;
-               }
-               section, header {
-                  display: block;
-               }
-
-               h1 {
-//                  padding-top: 10px;
-               }
-               h2 {
-                  font-size: 100%;
-                  font-style: italic;
-               }
-              article  {
-                  height: 100%;
-               }
-               #status {
-                  padding: 5px;
-                  color: #fff;
-                  background: #ccc;
-               }
-               #status.fail {
-                  background: #c00;
-               }
-               #status.success {
-                  background: #0c0;
-               }
-               #status.offline {
-                  background: #c00;
-               }
-               #status.online {
-                  background: #0c0;
-               }
-
-              .cesium-viewer-bottom,  .cesium-viewer-animationContainer, .cesium-viewer-timelineContainer{
-                  display: none;
-               }		
-              .cesium-viewer-toolbar{
-                  z-index: 2;
-               }					   
-
-            </style>
-				
-            <article>
-               <p id = "status">Not connected</p>
-               <ul id = "log"></ul>
-            </article>
-	
-
-            <script>
-			//<form onsubmit = "addMessage(); return false;">
-                //<input type = "text" id = "chat" placeholder = "Send Command (not working yet)" />
-               //</form>
-               //form = chat.form;
-			   
-               connected = document.getElementById("connected");
-               log = document.getElementById("log");
-               chat = document.getElementById("chat");
-               state = document.getElementById("status");
+	<div id="cesiumContainer"></div>
+	<section id = "wrapper">
+		<article>
+               <div id = "status">Not connected</div>
+			<div id="status-panel"><ul id="telemetry" ></ul></div>
+               <div id = "log-panel">
+			   <div>Log</div>
+			   <ul id = "log"></ul>
+			</div>
                
-					
-               if (window.WebSocket === undefined) {
-                  state.innerHTML = "sockets not supported";
-                  state.className = "fail";
-               }else {
-                  if (typeof String.prototype.startsWith != "function") {
-                     String.prototype.startsWith = function (str) {
-                        return this.indexOf(str) == 0;
-                     };
-                  }
-                  window.addEventListener("load", doConnect, false);
-               }
-					
-               function doConnect() {
-			   //var ip = "ws://"+ window.location.host+":3001";
- //                 var wsUri = "ws://"+ window.location.hostname+":3001";
-                  var wsUri = "ws://192.168.1.8:3001";
-                  websocket = new WebSocket(wsUri);
-                  websocket.onopen = function(evt) { onOpen(evt) };
-                  websocket.onclose = function(evt) { onClose(evt) };
-                  websocket.onmessage = function(evt) { onMessage(evt) };
-                  websocket.onerror = function(evt) { onError(evt) };
-               }
-			   window.dodoConnect=doConnect;
-					
-               function onOpen(evt) {
-                  state.className = "success";
-                  state.innerHTML = "Connected to server";
-               }
-					
-               function onClose(evt) {
-                  state.className = "fail";
-                  state.innerHTML = "Not connected";
-                  connected.innerHTML = "0";
-               }
-			
-			
-               function onMessage(evt) {
-			     var str = evt.data.substring(22)
-				 if(str.startsWith("GET:") || str.startsWith("PSH:"))
-				 {
-					var exp = str.substring(4);
-					var parts=exp.split("=");
-					var controllerName = parts[0].split(".")[0];
-					var keyName = parts[0].split(".")[1];
-					var keyValue = parts[1];
-					var e = $('*[data-id="'+controllerName+'-'+keyName+'"]')
-					if( e.length==0)
-					{
-						$("table#telemetry").append("<tr data-id="+controllerName+"-"+keyName+"><td>"+controllerName+"."+keyName+"</td><td>"+keyValue+"</td></tr>");
-					}else
-						e.find("td").eq(1).html(keyValue); 
-					
-					return;//dont display in log.
-				 }
-				//add to log window.
-				 log.innerHTML = log.innerHTML+'<li class = "message">' + 
-					evt.data.substring(9) + "</li>" ;//note substring cuts off date part of timestamp for brevity.
-				log.scrollTop = log.scrollHeight;
-return;
-
-				var msg = evt.data.split(" ")[2];
-				
-				if(msg.indexOf(":")>0)//system message?
-				{
-					var parts =msg.split(":");
-					var system = parts[0];
-					
-					parts =  parts[1].split("=");
-					var name = parts[0];
-					var value = parts[1];
-					var e =$("#"+system+"-"+name);
-					if(e.length==0)
-					{
-						$("table#telemetry").append("<tr id="+system+"-"+name+"><td>"+name+"</td><td>"+value+"</td></tr>");
-					}else
-					{
-						e.find("td").eq(1).html(value); 
-						//e.text(name+"="+value);
-					}
-					if(system==="P" && name=="Location")
-					{
-						if(!window.startLocation){
-							//console.log(parts)
-							var loc = value.split(",");
-							viewer.camera.flyTo({
-								destination : Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),1000.0)
-							});
-							window.startLocation=true
-						}
-						return;//dont display heatbeat in log.					
-					}
-				}
-				if(evt.data.indexOf("P:")>0)//message from pc?
-				{
-					var parts = evt.data.split("P:")[1].split(" ")
-					if(parts[0]==="screenshot")
-					{
-						var preview = document.getElementById("preview");
-						preview.src = parts[1];//update screenshot.
-						return;//dont display in log.
-					}else if(parts[0]==="location")
-					{
-						if(!window.startLocation){
-							console.log(parts)
-							window.startLocation=parts
-							viewer.camera.flyTo({
-								destination : Cesium.Cartesian3.fromDegrees(parseFloat(parts[2]),parseFloat(parts[1]),1000.0)
-							});
-						}
-						return;//dont display heatbeat in log.
-					}else
-					{
-					}
-				}
-				if(evt.data.indexOf("F:")>0)//message from flightcontroller?
-				{
-					var parts = evt.data.split("F:")[1].split(":")
-					if(parts[0]==="AircraftLocation")
-					{
-						//F:AircraftLocation:LocationCoordinate3D{latitude=47.76078060079433, longitude=-122.09482644836902, altitude=0.0}
-						return;//dont display in log.
-					}//else if(parts[0]==="location")
-				}				
-				
-				//add to log window.
-				 log.innerHTML = log.innerHTML+'<li class = "message">' + 
-					evt.data.substring(9) + "</li>" ;//note substring cuts off date part of timestamp for brevity.
-				log.scrollTop = log.scrollHeight;
-
-               }
-					
-               function onError(evt) {
-                  state.className = "fail";
-                  state.innerHTML = "Communication error";
-               }
-					
-               function addMessage() {
-                  var message = chat.value;
-                  chat.value = "";
-                  websocket.send(message);
-               }
-					
-            </script>
-         </section>
-		   <img id="preview" class="preview" src="/images/TestPattern.jpg">
-		   <div id="status-panel"><table id="telemetry" ></table></div>
-<img>
+		</article>
+     </section>
+	<img id="preview" class="preview" src="/images/TestPattern.jpg">
+	<div id="preview" class="preview"></div>
 </body>
+<script>
+	
+	//<form onsubmit = "addMessage(); return false;">
+		//<input type = "text" id = "chat" placeholder = "Send Command (not working yet)" />
+	   //</form>
+	   //form = chat.form;
+	   
+	   connected = document.getElementById("connected");
+	   log = document.getElementById("log");
+	   chat = document.getElementById("chat");
+	   state = document.getElementById("status");
+	   
+			
+	   if (window.WebSocket === undefined) {
+		  state.innerHTML = "sockets not supported";
+		  state.className = "fail";
+	   }else {
+		  if (typeof String.prototype.startsWith != "function") {
+			 String.prototype.startsWith = function (str) {
+				return this.indexOf(str) == 0;
+			 };
+		  }
+		  window.addEventListener("load", doConnect, false);
+	   }
+			
+	   function doConnect() {
+	   //var ip = "ws://"+ window.location.host+":3001";
+//		  var wsUri = "ws://"+ window.location.hostname+":3001";
+                 var wsUri = "ws://192.168.1.2:3001";
+		  websocket = new WebSocket(wsUri);
+		  websocket.onopen = function(evt) { onOpen(evt) };
+		  websocket.onclose = function(evt) { onClose(evt) };
+		  websocket.onmessage = function(evt) { onMessage(evt) };
+		  websocket.onerror = function(evt) { onError(evt) };
+	   }
+	   window.dodoConnect=doConnect;
+			
+	   function onOpen(evt) {
+		  state.className = "success";
+		  state.innerHTML = "Connected to server";
+	   }
+			
+	   function onClose(evt) {
+		  state.className = "fail";
+		  state.innerHTML = "Not connected";
+		  connected.innerHTML = "0";
+	   }
+	   
+	jQuery.fn.highlight = function() {
+		$(this).each(function() {
+			var el = $(this);
+			el.before("<td/>")
+			el.prev()
+				.width(el.width())
+				.height(el.height())
+				.css({
+					"position": "absolute",
+					"background-color": "#ffffbb",
+					"opacity": ".9"   
+				})
+				.fadeOut(500);
+		});
+	}
+	
+	   function onMessage(evt) {
+	   var messages = evt.data.split("|");
+	   for (var i = 0, len = messages.length; i < len; i++)
+	   {
+		 var str =messages[i].substring(22)
+		 if(str.startsWith("GET:") || str.startsWith("PSH:"))
+		 {
+			var exp = str.substring(4);
+			var parts=exp.split("=");
+			var controllerName = parts[0].split(".")[0];
+			var keyName = parts[0].split(".")[1];
+			var keyValue = parts[1];
+			var e = $('*[data-id="'+controllerName+'-'+keyName+'"]')
+			if( e.length==0)
+			{
+			   var ul= $('ul[data-id="'+controllerName+'"]');
+			   if(ul.length==0)
+			   {
+				$("ul#telemetry").append("<li>"+controllerName+"<ul data-id="+controllerName+"></ul></li>");
+				ul= $('ul[data-id="'+controllerName+'"]');
+			   }
+			   
+				//$("table#telemetry").append("<tr data-id="+controllerName+"-"+keyName+"><td>"+controllerName+"."+keyName+"</td><td>"+keyValue+"</td></tr>");
+				ul.append("<li><table><tr data-id="+controllerName+"-"+keyName+"><td>"+keyName+"</td><td class ='value'>"+keyValue+"</td></tr><table></li>");
+			}else{
+				var cell = e.find("td").eq(1)
+				cell.html(keyValue); 
+			}
+			
+			if(keyName==="screenshot")
+			{
+				//update screenshot.
+				$("#preview").attr("src",keyValue);
+			}
+			if(keyName==="Location" && controllerName=="Phone")
+			{
+				if(window.userEntity)
+				{
+					var loc = keyValue.split(",");
+					if(loc.length>1)
+					{
+						window.userEntity.position = Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),0.0)
+					}
+				}
+				
+				if(!window.startLocation){
+					var loc = keyValue.split(",");
+					if(loc.length>1)
+					{
+                        viewer.camera.flyTo({
+                            destination : Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),1000.0)
+                        });
+                        if(window.aircraftEntity){
+                            window.aircraftEntity.position = Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),0.0)
+                            window.lastLoc = [parseFloat(loc[1]),parseFloat(loc[0])]
+                            }
+                        window.startLocation=loc
+					}
+				}
+			}
+			if( controllerName=="FlightController")
+			{
+				if(keyName==="AircraftLocation"){
+					if(window.aircraftEntity)
+					{
+						var loc = keyValue.split(",");
+						if(loc.length==3){
+							window.aircraftEntity.position = Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),parseFloat(loc[2]))
+                            window.lastLoc = [parseFloat(loc[1]),parseFloat(loc[0])]
+						}
+					}
+				}
+				if(keyName==="CompassHeading"){
+					if(window.aircraftEntity)
+					{
+						var heading = keyValue.split(",");
+						if(heading.length==1){
+							var headingFloat =parseFloat(heading[0]);
+							if(!isNaN(headingFloat)){
+                                var heading = Cesium.Math.toRadians(headingFloat);
+                                var hpr = new Cesium.HeadingPitchRoll(heading, 0, 0);
+                                if(window.lastLoc)
+                                {
+                                    var center = Cesium.Cartesian3.fromDegrees(window.lastLoc[0], window.lastLoc[1]);
+                                    var orientation = Cesium.Transforms.headingPitchRollQuaternion(center, hpr);
+                                    if(!isNaN(orientation.x))
+                                        window.aircraftEntity.orientation = orientation;
+                                }
+							}
+						}
+					}
+				}
+
+
+
+			}
+		 }else
+		 {
+			//add to log window.
+			var msgPart = messages[i].substring(9) ;
+			if(msgPart.trim().length>0){
+				$("#log").append('<li class = "message">' + messages[i].substring(9) + "</li>");
+				log.scrollTop = log.scrollHeight;
+			}
+			
+		}
+	}
+	   }
+			
+	   function onError(evt) {
+		  state.className = "fail";
+		  state.innerHTML = "Communication error";
+	   }
+			
+	   function addMessage() {
+		  var message = chat.value;
+		  chat.value = "";
+		  websocket.send(message);
+	   }
+			
+	</script>
+	<script type='text/javascript'>//<![CDATA[
+	window.onload=function(){
+	var viewer = new Cesium.Viewer('cesiumContainer',{
+	//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
+	});
+	var viewer2 = new Cesium.Viewer('preview',{
+	//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
+	});
+	window.viewer=viewer;
+	var camera = viewer.scene.camera;
+
+	viewer.scene.preRender.addEventListener(function() {
+	return;
+		//lock north
+		camera.setView({
+			orientation: {
+				heading: 0,
+				pitch: camera.pitch,
+				roll: camera.roll
+			}
+		});
+	});
+
+	viewer.terrainProvider = new Cesium.CesiumTerrainProvider({
+		url : 'https://assets.agi.com/stk-terrain/world',
+		requestWaterMask : true, // required for water effects
+		requestVertexNormals : true // required for terrain lighting
+	});
+
+
+	 //viewer.scene.morphToColumbusView();
+		/*viewer.camera.flyTo({
+			destination : Cesium.Cartesian3.fromDegrees(-117.16, 32.71, 15000.0)
+		});*/
+		
+		var position = Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, 5.0);
+		var heading = Cesium.Math.toRadians(135);
+		var pitch = 0;
+		var roll = 0;
+		var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+		var orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+		
+		window.userEntity = viewer.entities.add({
+			name : 'man',
+			position : position,
+			orientation : orientation,
+			model : {
+				uri :  '3DMan.glb',
+    			heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+				minimumPixelSize : 22,
+				maximumScale : 20000,
+				scale : 1.0
+			}
+		});
+		window.aircraftEntity = viewer.entities.add({
+			name : 'mavic',
+			position : position,
+			orientation : orientation,
+			model : {
+				uri :  'MavicLOD.glb',
+    			heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+				minimumPixelSize : 22,
+				maximumScale : 20000,
+				scale : 1.0
+			}
+		});
+		viewer.trackedEntity = window.aircraftEntity;
+
+
+
+		
+	};
+
+
+	</script>
 </html>
 

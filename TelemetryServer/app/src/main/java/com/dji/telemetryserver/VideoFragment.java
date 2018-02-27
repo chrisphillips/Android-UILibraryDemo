@@ -152,22 +152,22 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
             @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
             public void onReceive( byte[] videoBuffer, int size ) {
-                //TelemetryService.Log("codec onReceive");
+                //TelemetryService.LogDebug"codec onReceive");
 
                 if(origCallback!=null)
                 {
-                    //TelemetryService.Log("codec passthru");
+                    //TelemetryService.LogDebug"codec passthru");
                     //origCallback.onReceive(videoBuffer,size);
                 }
                 if (mCodecManager != null) {
                     // Send the raw H264 video data to codec manager for decoding
-                    //TelemetryService.Log("codec onReceive to DJI");
+                    //TelemetryService.LogDebug"codec onReceive to DJI");
                     mCodecManager.sendDataToDecoder(videoBuffer, size);
                 }
 
                 boolean useFF = true;
                 if (useFF) {
-                    //TelemetryService.Log("codec onReceive to DJIVideoStreamDecoder");
+                    //TelemetryService.LogDebug"codec onReceive to DJIVideoStreamDecoder");
                     DJIVideoStreamDecoder.getInstance().parse(videoBuffer, size);
                 }
 
@@ -180,7 +180,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
 
     @Override
     public void onResume() {
-        TelemetryService.Log("codec onResume");
+        TelemetryService.LogDebug("codec onResume");
 //new
  //createSurfaceListeners();
 //        setVideoCallbacks();
@@ -193,14 +193,14 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
 
     @Override
     public void onPause() {
-        TelemetryService.Log("codec onPause");
+        TelemetryService.LogDebug("codec onPause");
 //        uninitPreviewer();
         super.onPause();
     }
 
     @Override
     public void onDestroy() {
-        TelemetryService.Log("codec onDestroy");
+        TelemetryService.LogDebug("codec onDestroy");
 //        uninitPreviewer();
         super.onDestroy();
     }
@@ -237,7 +237,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-        TelemetryService.Log("codec onSurfaceTextureAvailable");
+        TelemetryService.LogDebug("codec onSurfaceTextureAvailable");
         if (mCodecManager == null) {
             mCodecManager = new DJICodecManager(getActivity(), surfaceTexture, width, height);
             setVideoCallbacks();
@@ -248,12 +248,12 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
-        //TelemetryService.Log("codec onSurfaceTextureSizeChanged");
+        //TelemetryService.LogDebug"codec onSurfaceTextureSizeChanged");
     }
 
     @Override
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
-        //TelemetryService.Log("codec onSurfaceTextureDestroyed");
+        //TelemetryService.LogDebug"codec onSurfaceTextureDestroyed");
         if (mCodecManager != null) {
             mCodecManager.cleanSurface();
             mCodecManager = null;
@@ -281,7 +281,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
     {
         //todo factor this out.
         mVideo_texture = (TextureView) view.findViewById(R.id.livestream_preview_ttv);
-        TelemetryService.Log("codec newViewCreated!!!!!!!!!!!!!");
+        TelemetryService.LogDebug("codec newViewCreated!");
         myView=view;
         //videostreamPreviewSf = (SurfaceView) view.findViewById(R.id.mypreview);
     }
@@ -290,27 +290,27 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
     private boolean listenerInstalled=false;
     public void notifyProductUpdate()
     {
-        TelemetryService.Log("codec notifyProductUpdate");
+        TelemetryService.LogDebug("codec notifyProductUpdate");
 
         if(VideoFeeder.getInstance()==null || VideoFeeder.getInstance().getPrimaryVideoFeed()==null)
         {
-            TelemetryService.Log("codec notifyProductUpdate Camera unavalible");
+            TelemetryService.LogDebug("codec notifyProductUpdate Camera unavalible");
             return;
         }
 
         if(myView!=null) {
-            TelemetryService.Log("codec myView "+listenerInstalled);
+            TelemetryService.LogDebug("codec myView "+listenerInstalled);
 
             if(myView==null)
                 mVideo_texture = (TextureView) myView.findViewById(R.id.livestream_preview_ttv);
 
             if (mVideo_texture!=null && !listenerInstalled) {
-                TelemetryService.Log("codec notifyProductUpdate setSurfaceTextureListener");
+                TelemetryService.LogDebug("codec notifyProductUpdate setSurfaceTextureListener");
                 mVideo_texture.setSurfaceTextureListener(this);
                 listenerInstalled=true;
             }
             if (mCodecManager == null) {
-                TelemetryService.Log("codec notifyProductUpdate new DJICodecManager");
+                TelemetryService.LogDebug("codec notifyProductUpdate new DJICodecManager");
 
                 //force init at start.
                 mCodecManager = new DJICodecManager(getActivity(), mVideo_texture.getSurfaceTexture(), mVideo_texture.getWidth(), mVideo_texture.getHeight());
@@ -326,9 +326,9 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         if(VideoFeeder.getInstance()!=null && VideoFeeder.getInstance().getPrimaryVideoFeed()!=null) {
             VideoFeeder.VideoDataCallback curCallback = VideoFeeder.getInstance().getPrimaryVideoFeed().getCallback();
             if ((curCallback == null) || (curCallback != mReceivedVideoDataCallBack)) {
-                TelemetryService.Log("codec setVideoCallbacks");
+                TelemetryService.LogDebug("codec setVideoCallbacks");
                 if(origCallback==null)
-                    TelemetryService.Log("codec origCallback is NULL");
+                    TelemetryService.LogDebug("codec origCallback is NULL");
                 origCallback=curCallback;
                 VideoFeeder.getInstance().getPrimaryVideoFeed().setCallback(mReceivedVideoDataCallBack);
 //            createH264(videoOutName);
@@ -345,7 +345,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         if(surfaceReady)
             return;
         surfaceReady=true;
-        TelemetryService.Log("codec createSurfaceListeners()");
+        TelemetryService.LogDebug("codec createSurfaceListeners()");
 
         videostreamPreviewSf = (SurfaceView) myView.findViewById(R.id.mypreview);
         SurfaceHolder videostreamPreviewSh = videostreamPreviewSf.getHolder();
@@ -353,7 +353,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
 
-                TelemetryService.Log("codec surfaceCreated");
+                TelemetryService.LogDebug("codec surfaceCreated");
                 NativeHelper.getInstance().init();
                 DJIVideoStreamDecoder.getInstance().init(getContext(), videostreamPreviewSh.getSurface());
                 DJIVideoStreamDecoder.getInstance().setYuvDataListener(VideoFragment.this);
@@ -364,14 +364,14 @@ DJIVideoStreamDecoder.getInstance().changeSurface(null);
 
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-                TelemetryService.Log("codec surfaceChanged");
+                TelemetryService.LogDebug("codec surfaceChanged");
                 DJIVideoStreamDecoder.getInstance().changeSurface(holder.getSurface());
 //       DJIVideoStreamDecoder.getInstance().changeSurface(null);
             }
 
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
-                TelemetryService.Log("codec surfaceDestroyed");
+                TelemetryService.LogDebug("codec surfaceDestroyed");
                 DJIVideoStreamDecoder.getInstance().stop();
                 DJIVideoStreamDecoder.getInstance().destroy();
                 NativeHelper.getInstance().release();
@@ -388,7 +388,7 @@ DJIVideoStreamDecoder.getInstance().changeSurface(null);
     private int screenShotInterval = 30;
     @Override
     public void onYuvDataReceived(byte[] yuvFrame, int width, int height) {
-//        TelemetryService.Log("codec onYuvDataReceived");
+//        TelemetryService.LogDebug"codec onYuvDataReceived");
         //In this demo, we test the YUV data by saving it into JPG files.
         if (screenShotInterval> 0 && (DJIVideoStreamDecoder.getInstance().frameIndex % screenShotInterval == 0)) {
             byte[] y = new byte[width * height];
@@ -479,7 +479,7 @@ DJIVideoStreamDecoder.getInstance().changeSurface(null);
             return;
         }
 
-        TelemetryService.Log("P:screenshot "+remotePath);
+        TelemetryService.LogDebug("PSH:Phone.screenshot="+remotePath);
 
         //runOnUiThread(new Runnable() {
         //    @Override

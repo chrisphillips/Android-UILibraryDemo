@@ -2,9 +2,11 @@ package com.dji.telemetryserver;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Path;
 import android.location.Location;
 import android.os.Environment;
 import android.os.Handler;
+import android.provider.MediaStore;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
@@ -18,14 +20,17 @@ import com.koushikdutta.async.http.server.HttpServerRequestCallback;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import dji.common.Stick;
 import dji.common.remotecontroller.ChargeRemaining;
@@ -160,7 +165,7 @@ public class TelemetryService {
             appendToFile(logPath,message+"\r\n");
 
         //broadcast to connected websockets
-        outputBuffer+=message+"|";
+        outputBuffer+=message+"\n";
         if(outputBuffer.length()>1024)
         {
             flushOutputBuffer();
@@ -188,8 +193,22 @@ public class TelemetryService {
                     webSockets.add(webSocket);
                     //log("Log Connected.");
                     TelemetryService.LogDebug("Client connected.");
-DJIKeyedInterface.doGetAll();
-DJIKeyedInterface.startListeners();
+
+                    //send log so far.
+                    try {
+                        RandomAccessFile f = null;
+                        f = new RandomAccessFile(logPath, "r");
+                        f.seek(0);
+                        byte[] b = new byte[(int)f.length()];
+                        f.readFully(b);
+                        webSocket.send(new String(b));
+                        f.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    //This might not be needed. The gets are probably redundant.
+                    DJIKeyedInterface.doGetAll();
 
                     //Cleanup socket on close.
                     webSocket.setClosedCallback(new CompletedCallback() {
@@ -332,7 +351,7 @@ DJIKeyedInterface.startListeners();
         //set output log file name.
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         logPath = logDir + "Log_" + timeStamp + ".txt";
-        Log("Debug.message=Logging started "+logPath);
+        Log("Logging started "+logPath);
 
         Handler handler = new Handler();
         int delay = 1000; //milliseconds

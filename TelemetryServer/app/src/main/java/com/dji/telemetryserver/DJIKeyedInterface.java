@@ -11,13 +11,18 @@ import dji.common.LightbridgePIPPosition;
 import dji.common.LightbridgeSecondaryVideoFormat;
 import dji.common.Stick;
 import dji.common.airlink.ChannelSelectionMode;
+import dji.common.airlink.FrequencyInterference;
+import dji.common.airlink.LightbridgeAntennaRSSI;
 import dji.common.airlink.LightbridgeFrequencyBand;
 import dji.common.airlink.LightbridgeSecondaryVideoDisplayMode;
 import dji.common.airlink.LightbridgeSecondaryVideoOutputPort;
 import dji.common.airlink.LightbridgeTransmissionMode;
 import dji.common.airlink.LightbridgeUnit;
 import dji.common.airlink.OcuSyncBandwidth;
+import dji.common.airlink.OcuSyncWarningMessage;
 import dji.common.airlink.WiFiFrequencyBand;
+import dji.common.airlink.WiFiMagneticInterferenceLevel;
+import dji.common.airlink.WifiChannelInterference;
 import dji.common.airlink.WifiDataRate;
 import dji.common.battery.AggregationState;
 import dji.common.battery.BatteryCellVoltageLevel;
@@ -125,15 +130,19 @@ public class DJIKeyedInterface {
     public enum KeyAccessTypes {
         GET, SET, PUSH, ACTION
     }
+    //Wrapper around the DJIKey.
+    //associates the type and keyName
+    //for the log message callback.
     public static class DJIKeyInfo {
 
         //        public Class<? extends DJIKey> controller;
-        public String controllerName;
-        public String keyName;
-        public KeyAccessTypes accessType;
-        public Object keyType;
-        public DJIKey key;
+        public String controllerName;//FlightController,Camera etc.
+        public String keyName;//String name of the key for the message.
+        public KeyAccessTypes accessType;//GET,SET,PUSH,ACTION
+        public Object keyType;//not used for anything yet.
+        public DJIKey key;//The key that will be passed to the listner.
 
+        //Build a key from strings.
         public DJIKeyInfo(String controllerName, String keyName, KeyAccessTypes accessType, Object keyType) {
             this.controllerName = controllerName;
             this.keyName = keyName;
@@ -151,12 +160,14 @@ public class DJIKeyedInterface {
                 key = ProductKey.create(keyName);
             } else if (controllerName == "Battery") {
                 key = BatteryKey.create(keyName);
+            } else if (controllerName == "Airlink") {
+                key = AirLinkKey.create(keyName);
             }
 
         }
     }
         //Convert the value that comes back to a string for a log message.
-        //Support new types as they are found.
+        //Need to add support for new types as they are found.
     public static String DJIValueToString(Object value) {
         if (value == null)
             return "null";
@@ -189,19 +200,24 @@ public class DJIKeyedInterface {
             Attitude att = (Attitude) value;
             String msg = "" + att.getPitch()+","+att.getRoll()+","+att.getYaw();
             return msg;
+        } else if (value instanceof WhiteBalance) {
+            WhiteBalance wb = (WhiteBalance) value;
+            String msg = "" + wb.getWhiteBalancePreset();
+            return msg;
         } else {
             return value.toString();
         }
     }
-    private static boolean bListening=false;
+    //Start listeners on important keys.
+    //Logs a PUSH message each time a value changes.
     public static void startListeners()
     {
-//        if(bListening)//already are?
-//            return;
-        if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null)
+        if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null) {
+            TelemetryService.Log("ERROR startListeners() before SDK is ready.");
             return;//not ready yet.
+        }
         KeyManager keyManager = DJISDKManager.getInstance().getKeyManager();
-        for (DJIKeyInfo keyinfo : importantKeys) {
+        for (DJIKeyInfo keyinfo : allKeys) {
             if (keyinfo.accessType == GET || keyinfo.accessType == PUSH) {
                 String keyName = keyinfo.controllerName + "." + keyinfo.keyName;
 
@@ -213,19 +229,18 @@ public class DJIKeyedInterface {
                 });
             }
         }
-        bListening=true;
-
     }
 
+    //Do a get of all important keys.
+    //Used to get the inital state.
     public static void doGetAll() {
-        if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null)
+        if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null){
+            TelemetryService.Log("WARN doGetAll() before SDK ready.");
             return;//not ready yet.
-
-        //right place?
-        //startListeners();
+        }
 
         KeyManager keyManager = DJISDKManager.getInstance().getKeyManager();
-        for (DJIKeyInfo keyinfo : importantKeys) {
+        for (DJIKeyInfo keyinfo : allKeys) {
             if (keyinfo.accessType == GET || keyinfo.accessType == PUSH) {
                 String keyName = keyinfo.controllerName + "." + keyinfo.keyName;
                 Object value = keyManager.getValue(keyinfo.key);
@@ -236,12 +251,20 @@ public class DJIKeyedInterface {
     }
 
     static DJIKeyInfo importantKeys[] = new DJIKeyInfo[]{
-            new DJIKeyInfo("FlightController", FlightControllerKey.SIMULATOR_STATE, PUSH, SimulatorState.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.HOME_LOCATION, GET, LocationCoordinate2D.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.AIRCRAFT_LOCATION, PUSH, LocationCoordinate3D.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.ALTITUDE, PUSH, Float.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_YAW, PUSH, Double.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_PITCH, PUSH, Double.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_ROLL, PUSH, Double.class),
+//same as yaw?            new DJIKeyInfo("FlightController", FlightControllerKey.COMPASS_HEADING, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.VELOCITY_Y, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.VELOCITY_X, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.VELOCITY_Z, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.SATELLITE_COUNT, PUSH, Integer.class),
+
+            new DJIKeyInfo("FlightController", FlightControllerKey.HOME_LOCATION_LATITUDE, PUSH, Double.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.HOME_POINT_ALTITUDE, PUSH, Float.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.HOME_LOCATION_LONGITUDE, PUSH, Double.class),
 
             new DJIKeyInfo("FlightController", FlightControllerKey.REMAINING_FLIGHT_TIME, PUSH, Integer.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.GPS_SIGNAL_LEVEL, PUSH, GPSSignalLevel.class),
@@ -249,16 +272,12 @@ public class DJIKeyedInterface {
             new DJIKeyInfo("FlightController", FlightControllerKey.FLY_TIME_IN_SECONDS, PUSH, Integer.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.ULTRASONIC_HEIGHT_IN_METERS, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.GO_HOME_STATUS, PUSH, GoHomeExecutionState.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_ROLL, PUSH, Double.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.COMPASS_HEADING, PUSH, Float.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.AIRCRAFT_LOCATION, PUSH, LocationCoordinate3D.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.IS_FLYING, PUSH, Boolean.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.ALTITUDE, PUSH, Float.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_YAW, PUSH, Double.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.ARE_MOTOR_ON, PUSH, Boolean.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.SIMULATOR_STATE, PUSH, SimulatorState.class),
 
             new DJIKeyInfo("FlightController", FlightControllerKey.HOME_LOCATION, GET, LocationCoordinate2D.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.CONTROL_MODE, GET, ControlMode.class),
+//null            new DJIKeyInfo("FlightController", FlightControllerKey.CONTROL_MODE, GET, ControlMode.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.GO_HOME_HEIGHT_IN_METERS, GET, Integer.class),
 
 
@@ -283,14 +302,14 @@ public class DJIKeyedInterface {
             new DJIKeyInfo("Gimbal", GimbalKey.ATTITUDE_IN_DEGREES, PUSH, Attitude.class),
 
             new DJIKeyInfo("Camera", CameraKey.SHUTTER_SPEED, PUSH, SettingsDefinitions.ShutterSpeed.class),
-            new DJIKeyInfo("Camera", CameraKey.ISO_RANGE, PUSH, SettingsDefinitions.ISO[].class),
+//            new DJIKeyInfo("Camera", CameraKey.ISO_RANGE, PUSH, SettingsDefinitions.ISO[].class),
             new DJIKeyInfo("Camera", CameraKey.MODE, PUSH, SettingsDefinitions.CameraMode.class),
             new DJIKeyInfo("Camera", CameraKey.SDCARD_TOTAL_SPACE_IN_MB, PUSH, Integer.class),
-            new DJIKeyInfo("Camera", CameraKey.EXPOSURE_SETTINGS, PUSH, ExposureSettings.class),
-//            new DJIKeyInfo("Camera", CameraKey.CURRENT_VIDEO_RECORDING_TIME_IN_SECONDS, PUSH, Integer.class),
+//            new DJIKeyInfo("Camera", CameraKey.EXPOSURE_SETTINGS, PUSH, ExposureSettings.class),
+            new DJIKeyInfo("Camera", CameraKey.CURRENT_VIDEO_RECORDING_TIME_IN_SECONDS, PUSH, Integer.class),
             new DJIKeyInfo("Camera", CameraKey.RESOLUTION_FRAME_RATE, PUSH, ResolutionAndFrameRate.class),
             new DJIKeyInfo("Camera", CameraKey.IS_RECORDING, PUSH, Boolean.class),
-//            new DJIKeyInfo("Camera", CameraKey.SDCARD_AVAILABLE_RECORDING_TIME_IN_SECONDS, PUSH, Integer.class),
+            new DJIKeyInfo("Camera", CameraKey.SDCARD_AVAILABLE_RECORDING_TIME_IN_SECONDS, PUSH, Integer.class),
             new DJIKeyInfo("Camera", CameraKey.FOCUS_MODE, PUSH, SettingsDefinitions.FocusMode.class),
             new DJIKeyInfo("Camera", CameraKey.SHOOT_PHOTO_MODE, PUSH, SettingsDefinitions.ShootPhotoMode.class),
             new DJIKeyInfo("Camera", CameraKey.PHOTO_FILE_FORMAT, PUSH, SettingsDefinitions.PhotoFileFormat.class),
@@ -610,7 +629,7 @@ public class DJIKeyedInterface {
                 new DJIKeyInfo("RemoteController", RemoteControllerKey.REMOVE_BUTTON_PROFILE_GROUP, ACTION, String.class),
                 new DJIKeyInfo("RemoteController", RemoteControllerKey.START_PAIRING, ACTION, void.class),
                 new DJIKeyInfo("RemoteController", RemoteControllerKey.START_SEARCH_MASTER, ACTION, void.class),
-/*
+
                 new DJIKeyInfo("Gimbal", GimbalKey.YAW_SMOOTH_TRACK_DEADBAND, GET, Integer.class),
                 new DJIKeyInfo("Gimbal", GimbalKey.YAW_INVERTED_CONTROL_ENABLED, GET, void.class),
                 new DJIKeyInfo("Gimbal", GimbalKey.PITCH_MOTOR_CONTROL_PRE_CONTROL, GET, Integer.class),
@@ -1082,79 +1101,79 @@ public class DJIKeyedInterface {
                 new DJIKeyInfo("Battery", BatteryKey.LEVEL_1_CELL_VOLTAGE_THRESHOLD, SET, Integer.class),
 
                 new DJIKeyInfo("Battery", BatteryKey.PAIR_BATTERIES, ACTION, void.class),
-*/
-/*
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_RANGE,GET,Integer[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.PASSWORD,GET,String.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_UNIT,GET,LightbridgeUnit.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OUTPUT_PORT,GET,LightbridgeSecondaryVideoOutputPort.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_INTERFERENCE,GET,WifiChannelInterference[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SSID,GET,String.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SUPPORTED_FREQUENCY_BANDS,GET,LightbridgeFrequencyBand[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.AVAILABLE_CHANNEL_NUMBERS,GET,Integer[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_TOP_MARGIN,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_LEFT_MARGIN,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SDI_OUTPUT_FORMAT,GET,LightbridgeSecondaryVideoFormat.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_ENABLED,GET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.FREQUENCY_POINT_RSSIS,GET,FrequencyInterference[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_DISPLAY_MODE,GET,LightbridgeSecondaryVideoDisplayMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OUTPUT_ENABLED,GET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.PIP_POSITION,GET,LightbridgePIPPosition.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.HDMI_OUTPUT_FORMAT,GET,LightbridgeSecondaryVideoFormat.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.IS_LIGHTBRIDGE_LINK_SUPPORTED,GET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.FREQUENCY_POINT_INDEX,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_BOTTOM_MARGIN,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH,GET,OcuSyncBandwidth.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_SELECTION_MODE,GET,ChannelSelectionMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.DATA_RATE,GET,WifiDataRate.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.TRANSMISSION_MODE,GET,LightbridgeTransmissionMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_RIGHT_MARGIN,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_HDMI_VIDEO_INPUT_PORT,GET,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.WIFI_FREQUENCY_BAND,GET,WiFiFrequencyBand.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_NUMBER,GET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.IS_WIFI_LINK_SUPPORTED,GET,Boolean.class)
 
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.IS_EXT_VIDEO_INPUT_PORT_ENABLED,PUSH,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.UPLINK_SIGNAL_QUALITY,PUSH,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.WARNING_MESSAGES,PUSH,OcuSyncWarningMessage[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.REMOTE_CONTROLLER_ANTENNA_RSSI,PUSH,LightbridgeAntennaRSSI.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.AIRCRAFT_ANTENNA_RSSI,PUSH,LightbridgeAntennaRSSI.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.MAGNETIC_INTERFERENCE,PUSH,WiFiMagneticInterferenceLevel.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LEFT_CAMERA,PUSH,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.FREQUENCY_POINT_INDEX_VALID_RANGE,PUSH,Integer[].class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.DOWNLINK_SIGNAL_QUALITY,PUSH,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LB_VIDEO_INPUT_PORT,PUSH,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.LB_FREQUENCY_BAND,PUSH,LightbridgeFrequencyBand.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.DYNAMIC_DATA_RATE,PUSH,Float.class)
+/* All these values seem to be null. Only used on high end models?
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_RANGE,GET,Integer[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.PASSWORD,GET,String.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_UNIT,GET,LightbridgeUnit.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OUTPUT_PORT,GET,LightbridgeSecondaryVideoOutputPort.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_INTERFERENCE,GET,WifiChannelInterference[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SSID,GET,String.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SUPPORTED_FREQUENCY_BANDS,GET,LightbridgeFrequencyBand[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.AVAILABLE_CHANNEL_NUMBERS,GET,Integer[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_TOP_MARGIN,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_LEFT_MARGIN,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SDI_OUTPUT_FORMAT,GET,LightbridgeSecondaryVideoFormat.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_ENABLED,GET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.FREQUENCY_POINT_RSSIS,GET,FrequencyInterference[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_DISPLAY_MODE,GET,LightbridgeSecondaryVideoDisplayMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OUTPUT_ENABLED,GET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.PIP_POSITION,GET,LightbridgePIPPosition.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.HDMI_OUTPUT_FORMAT,GET,LightbridgeSecondaryVideoFormat.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.IS_LIGHTBRIDGE_LINK_SUPPORTED,GET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.FREQUENCY_POINT_INDEX,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_BOTTOM_MARGIN,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH,GET,OcuSyncBandwidth.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_SELECTION_MODE,GET,ChannelSelectionMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.DATA_RATE,GET,WifiDataRate.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.TRANSMISSION_MODE,GET,LightbridgeTransmissionMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_RIGHT_MARGIN,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_HDMI_VIDEO_INPUT_PORT,GET,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.WIFI_FREQUENCY_BAND,GET,WiFiFrequencyBand.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_NUMBER,GET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.IS_WIFI_LINK_SUPPORTED,GET,Boolean.class),
 
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.IS_EXT_VIDEO_INPUT_PORT_ENABLED,SET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.PASSWORD,SET,String.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_UNIT,SET,LightbridgeUnit.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OUTPUT_PORT,SET,LightbridgeSecondaryVideoOutputPort.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SSID,SET,String.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_TOP_MARGIN,SET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_LEFT_MARGIN,SET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SDI_OUTPUT_FORMAT,SET,LightbridgeSecondaryVideoFormat.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_ENABLED,SET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LEFT_CAMERA,SET,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_DISPLAY_MODE,SET,LightbridgeSecondaryVideoDisplayMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OUTPUT_ENABLED,SET,Boolean.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.PIP_POSITION,SET,LightbridgePIPPosition.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.HDMI_OUTPUT_FORMAT,SET,LightbridgeSecondaryVideoFormat.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LB_VIDEO_INPUT_PORT,SET,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.LB_FREQUENCY_BAND,SET,LightbridgeFrequencyBand.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.FREQUENCY_POINT_INDEX,SET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_BOTTOM_MARGIN,SET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH,SET,OcuSyncBandwidth.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_SELECTION_MODE,SET,ChannelSelectionMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.DATA_RATE,SET,WifiDataRate.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.TRANSMISSION_MODE,SET,LightbridgeTransmissionMode.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.SECONDARY_VIDEO_OSD_RIGHT_MARGIN,SET,Integer.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_HDMI_VIDEO_INPUT_PORT,SET,Float.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.WIFI_FREQUENCY_BAND,SET,WiFiFrequencyBand.class),
-            new DJIKeyInfo("AirLinkKey",AirLinkKey.CHANNEL_NUMBER,SET,Integer.class)
+            new DJIKeyInfo("AirLink",AirLinkKey.IS_EXT_VIDEO_INPUT_PORT_ENABLED,PUSH,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.UPLINK_SIGNAL_QUALITY,PUSH,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.WARNING_MESSAGES,PUSH,OcuSyncWarningMessage[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.REMOTE_CONTROLLER_ANTENNA_RSSI,PUSH,LightbridgeAntennaRSSI.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.AIRCRAFT_ANTENNA_RSSI,PUSH,LightbridgeAntennaRSSI.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.MAGNETIC_INTERFERENCE,PUSH,WiFiMagneticInterferenceLevel.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LEFT_CAMERA,PUSH,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.FREQUENCY_POINT_INDEX_VALID_RANGE,PUSH,Integer[].class),
+            new DJIKeyInfo("AirLink",AirLinkKey.DOWNLINK_SIGNAL_QUALITY,PUSH,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LB_VIDEO_INPUT_PORT,PUSH,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.LB_FREQUENCY_BAND,PUSH,LightbridgeFrequencyBand.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.DYNAMIC_DATA_RATE,PUSH,Float.class),
 
-            new DJIKeyInfo("AirLinkKey", AirLinkKey.REBOOT,ACTION,void.class)
+            new DJIKeyInfo("AirLink",AirLinkKey.IS_EXT_VIDEO_INPUT_PORT_ENABLED,SET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.PASSWORD,SET,String.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_UNIT,SET,LightbridgeUnit.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OUTPUT_PORT,SET,LightbridgeSecondaryVideoOutputPort.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SSID,SET,String.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_TOP_MARGIN,SET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_LEFT_MARGIN,SET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SDI_OUTPUT_FORMAT,SET,LightbridgeSecondaryVideoFormat.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_ENABLED,SET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LEFT_CAMERA,SET,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_DISPLAY_MODE,SET,LightbridgeSecondaryVideoDisplayMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OUTPUT_ENABLED,SET,Boolean.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.PIP_POSITION,SET,LightbridgePIPPosition.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.HDMI_OUTPUT_FORMAT,SET,LightbridgeSecondaryVideoFormat.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_LB_VIDEO_INPUT_PORT,SET,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.LB_FREQUENCY_BAND,SET,LightbridgeFrequencyBand.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.FREQUENCY_POINT_INDEX,SET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_BOTTOM_MARGIN,SET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH,SET,OcuSyncBandwidth.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_SELECTION_MODE,SET,ChannelSelectionMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.DATA_RATE,SET,WifiDataRate.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.TRANSMISSION_MODE,SET,LightbridgeTransmissionMode.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.SECONDARY_VIDEO_OSD_RIGHT_MARGIN,SET,Integer.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.BANDWIDTH_ALLOCATION_FOR_HDMI_VIDEO_INPUT_PORT,SET,Float.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.WIFI_FREQUENCY_BAND,SET,WiFiFrequencyBand.class),
+            new DJIKeyInfo("AirLink",AirLinkKey.CHANNEL_NUMBER,SET,Integer.class),
+
+            new DJIKeyInfo("AirLink", AirLinkKey.REBOOT,ACTION,void.class),
 */
 
 

@@ -66,7 +66,6 @@ public class DemoApplication extends Application {
         telemetryService = new TelemetryService();
 
 
-
         /**
          * When starting SDK services, an instance of interface DJISDKManager.DJISDKManagerCallback will be used to listen to
          * the SDK Registration result and the product changing.
@@ -77,6 +76,10 @@ public class DemoApplication extends Application {
             @Override
             public void onRegister(DJIError error) {
                 if(error == DJISDKError.REGISTRATION_SUCCESS) {
+
+                    //start SDK key listerners after registered but before anything else.
+                    DJIKeyedInterface.startListeners();
+
                     DJISDKManager.getInstance().startConnectionToProduct();
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -86,10 +89,7 @@ public class DemoApplication extends Application {
 //                            DJISDKManager.getInstance().enableBridgeModeWithBridgeAppIP("192.168.1.2");
                         }
                     });
-                    //loginAccount();
-
-                    //start listening to SDK keys for logging.
-                    //TelemetryService.getInstance().startListeners();
+                    //loginAccount();//crashes for some reason.
 
                     notifyStatusChange();
 
@@ -170,6 +170,8 @@ if(isConnected) {
             }
 
         };
+
+
         //Check the permissions before registering the application for android system 6.0 above.
         int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
         int permissionCheck2 = ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.READ_PHONE_STATE);

@@ -156,7 +156,6 @@
 		</article>
      </section>
 	<img id="preview" class="preview" src="/images/TestPattern.jpg">
-	<div id="preview" class="preview"></div>
 </body>
 <script>
 	
@@ -223,7 +222,7 @@
 	}
 	
 	   function onMessage(evt) {
-	   var messages = evt.data.split("|");
+	   var messages = evt.data.split("\n");
 	   for (var i = 0, len = messages.length; i < len; i++)
 	   {
 		 var str =messages[i].substring(22)

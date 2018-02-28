@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Surface;
 
 import com.dji.telemetryserver.R;
+import com.dji.telemetryserver.TelemetryService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -370,38 +371,38 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
         if (codec != null) {
             releaseCodec();
         }
-        loge("initVideoDecoder----------------------------------------------------------");
-        loge("initVideoDecoder video width = " + width + "  height = " + height);
+        TelemetryService.LogDebug("initVideoDecoder----------------------------------------------------------");
+        TelemetryService.LogDebug("initVideoDecoder video width = " + width + "  height = " + height);
         // create the media format
         MediaFormat format = MediaFormat.createVideoFormat(VIDEO_ENCODING_FORMAT, width, height);
         if (surface == null) {
-            logd("initVideoDecoder: yuv output");
+            TelemetryService.LogDebug("initVideoDecoder: yuv output");
             // The surface is null, which means that the yuv data is needed, so the color format should
             // be set to YUV420.
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
         } else {
-            logd("initVideoDecoder: display");
+            TelemetryService.LogDebug("initVideoDecoder: display");
             // The surface is set, so the color format should be set to format surface.
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
         }
         try {
             // Create the codec instance.
             codec = MediaCodec.createDecoderByType(VIDEO_ENCODING_FORMAT);
-            logd( "initVideoDecoder create: " + (codec == null));
+            TelemetryService.LogDebug( "initVideoDecoder create: " + (codec == null));
             // Configure the codec. What should be noted here is that the hardware decoder would not output
             // any yuv data if a surface is configured into, which mean that if you want the yuv frames, you
             // should set "null" surface when calling the "configure" method of MediaCodec.
             codec.configure(format, surface, null, 0);
-            logd( "initVideoDecoder configure");
+            TelemetryService.LogDebug( "initVideoDecoder configure");
             //            codec.configure(format, null, null, 0);
             if (codec == null) {
-                loge("Can't find video info!");
+                TelemetryService.LogDebug("Can't find video info!");
                 return;
             }
             // Start the codec
             codec.start();
         } catch (Exception e) {
-            loge("init codec failed, do it again: " + e);
+            TelemetryService.LogDebug("init codec failed, do it again: " + e);
             if (e instanceof MediaCodec.CodecException) {
                 MediaCodec.CodecException ce = (MediaCodec.CodecException) e;
             }
@@ -503,6 +504,7 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
      */
     public void changeSurface(Surface surface) {
         if (this.surface != surface) {
+            TelemetryService.LogDebug("changeSurface"+(surface == null));
             this.surface = surface;
             if (dataHandler != null && !dataHandler.hasMessages(MSG_INIT_CODEC)) {
                 dataHandler.sendEmptyMessage(MSG_INIT_CODEC);
@@ -639,7 +641,9 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
 
             if (outIndex >= 0) {
                 //Log.d(TAG, "decodeFrame: outIndex: " + outIndex);
-                if (surface == null && yuvDataListener != null) {
+
+//                if (surface == null && yuvDataListener != null) {
+                if (yuvDataListener != null) {
                     // If the surface is null, the yuv data should be get from the buffer and invoke the callback.
                     logd("decodeFrame: need callback");
                     ByteBuffer yuvDataBuf = codec.getOutputBuffer(outIndex);

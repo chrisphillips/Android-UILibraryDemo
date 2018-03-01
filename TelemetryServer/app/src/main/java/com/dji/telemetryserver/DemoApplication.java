@@ -12,10 +12,19 @@ import android.widget.Toast;
 
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
+import dji.common.flightcontroller.simulator.InitializationData;
+import dji.common.flightcontroller.simulator.SimulatorState;
+import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
+import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
+import dji.common.flightcontroller.virtualstick.VerticalControlMode;
+import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.model.LocationCoordinate2D;
 import dji.common.useraccount.UserAccountState;
 import dji.common.util.CommonCallbacks;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
+import dji.sdk.flightcontroller.FlightController;
+import dji.sdk.products.Aircraft;
 import dji.sdk.sdkmanager.DJISDKManager;
 import dji.sdk.useraccount.UserAccountManager;
 
@@ -55,6 +64,15 @@ public class DemoApplication extends Application {
         return mProduct;
     }
 
+    public static boolean isAircraftConnected() {
+        return getProductInstance() != null && getProductInstance() instanceof Aircraft;
+    }
+
+    public static synchronized Aircraft getAircraftInstance() {
+        if (!isAircraftConnected()) return null;
+        return (Aircraft) getProductInstance();
+    }
+
     public TelemetryService telemetryService;
     @Override
     public void onCreate() {
@@ -78,7 +96,7 @@ public class DemoApplication extends Application {
                 if(error == DJISDKError.REGISTRATION_SUCCESS) {
 
                     //start SDK key listerners after registered but before anything else.
-                    DJIKeyedInterface.startListeners();
+                    DJIKeyedInterface.initListeners();
 
                     DJISDKManager.getInstance().startConnectionToProduct();
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -135,6 +153,7 @@ public class DemoApplication extends Application {
                 }
 //tell camera something has changed.
 VideoFragment.getInstance().notifyProductUpdate();
+
 
 //                    telemetryService.log("Install Hook"+key);
 //                if(key.name().equals("CAMERA"))
@@ -207,6 +226,57 @@ if(isConnected) {
         mHandler.removeCallbacks(updateRunnable);
         mHandler.postDelayed(updateRunnable, 500);
     }
+
+    public static void startSimulation()
+    {
+        Aircraft aircraft = getAircraftInstance();
+        if(aircraft==null)
+        {
+            TelemetryService.Log("Error starting simulation. No aircraft connected.");
+            return;
+        }
+
+        FlightController flightController = aircraft.getFlightController();
+        if(flightController.getSimulator().isSimulatorActive())
+        {
+            TelemetryService.Log("WARN simulation already started.");
+        }
+        TelemetryService.Log("Init SIMULATION");
+
+        flightController.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+        flightController.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+        flightController.setVerticalControlMode(VerticalControlMode.VELOCITY);
+        flightController.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+        flightController.getSimulator().setStateCallback(new SimulatorState.Callback() {
+            @Override
+            public void onUpdate(final SimulatorState stateData) {
+/*                String yaw = String.format("%.2f", stateData.getYaw());
+                String pitch = String.format("%.2f", stateData.getPitch());
+                String roll = String.format("%.2f", stateData.getRoll());
+                String positionX = String.format("%.2f", stateData.getPositionX());
+                String positionY = String.format("%.2f", stateData.getPositionY());
+                String positionZ = String.format("%.2f", stateData.getPositionZ());
+                TelemetryService.Log("Yaw : " + yaw + ", Pitch : " + pitch + ", Roll : " + roll + "\n" + ", PosX : " + positionX +
+                        ", PosY : " + positionY +
+                        ", PosZ : " + positionZ);
+*/
+            }
+        });
+        flightController.getSimulator()
+                .start(InitializationData.createInstance(new LocationCoordinate2D(23, 113), 10, 10),
+                        new CommonCallbacks.CompletionCallback() {
+                            @Override
+                            public void onResult(DJIError djiError) {
+                                if (djiError != null) {
+                                    TelemetryService.Log("Error starting simulation. ERROR:"+djiError.getDescription());
+                                }else
+                                {
+                                    TelemetryService.Log("Start Simulator Success");
+                                }
+                            }
+                        });
+    }
+
 
     private Runnable updateRunnable = new Runnable() {
 

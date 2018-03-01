@@ -3,9 +3,14 @@ package com.dji.telemetryserver;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.security.keystore.KeyInfo;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import dji.common.LightbridgePIPPosition;
 import dji.common.LightbridgeSecondaryVideoFormat;
@@ -116,10 +121,8 @@ import dji.keysdk.callback.GetCallback;
 import dji.keysdk.callback.KeyListener;
 import dji.sdk.sdkmanager.DJISDKManager;
 
-import static com.dji.telemetryserver.DJIKeyedInterface.KeyAccessTypes.ACTION;
-import static com.dji.telemetryserver.DJIKeyedInterface.KeyAccessTypes.GET;
-import static com.dji.telemetryserver.DJIKeyedInterface.KeyAccessTypes.PUSH;
-import static com.dji.telemetryserver.DJIKeyedInterface.KeyAccessTypes.SET;
+import static com.dji.telemetryserver.DJIKeyedInterface.DJIKeyInfo.KeyAccessTypes.*;
+
 
 /**
  * Created by chris on 2/23/2018.
@@ -127,20 +130,22 @@ import static com.dji.telemetryserver.DJIKeyedInterface.KeyAccessTypes.SET;
 
 public class DJIKeyedInterface {
 
-    public enum KeyAccessTypes {
-        GET, SET, PUSH, ACTION
-    }
     //Wrapper around the DJIKey.
     //associates the type and keyName
     //for the log message callback.
     public static class DJIKeyInfo {
 
-        //        public Class<? extends DJIKey> controller;
+        public enum KeyAccessTypes {
+            GET, SET, PUSH, ACTION
+        }
+
         public String controllerName;//FlightController,Camera etc.
         public String keyName;//String name of the key for the message.
         public KeyAccessTypes accessType;//GET,SET,PUSH,ACTION
         public Object keyType;//not used for anything yet.
         public DJIKey key;//The key that will be passed to the listner.
+        public KeyListener listener=null;//Callback object.
+
 
         //Build a key from strings.
         public DJIKeyInfo(String controllerName, String keyName, KeyAccessTypes accessType, Object keyType) {
@@ -166,7 +171,11 @@ public class DJIKeyedInterface {
 
         }
     }
-        //Convert the value that comes back to a string for a log message.
+
+    //Lookup by name for installed key listeners.
+    private static HashMap<String,DJIKeyInfo> keyListeners= new HashMap<String, DJIKeyInfo>();
+
+    //Convert the value that comes back frome the listeners to a string for the log message.
         //Need to add support for new types as they are found.
     public static String DJIValueToString(Object value) {
         if (value == null)
@@ -204,34 +213,59 @@ public class DJIKeyedInterface {
             WhiteBalance wb = (WhiteBalance) value;
             String msg = "" + wb.getWhiteBalancePreset();
             return msg;
+        } else if (value instanceof SimulatorState) {
+            SimulatorState ss = (SimulatorState) value;
+            String msg = "motorsOn:" + ss.areMotorsOn()+",isFlying:"+ss.isFlying();
+            return msg;
         } else {
             return value.toString();
         }
     }
     //Start listeners on important keys.
     //Logs a PUSH message each time a value changes.
-    public static void startListeners()
+    public static void initListeners()
     {
+        startListeners(importantKeys);
+    }
+    //Listen to ALL sdk keys.
+    public static void startAllListeners()
+    {
+        startListeners(allKeys);
+    }
+
+    //Start a set of listeners.
+    private static void startListeners(DJIKeyInfo[] keys){
         if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null) {
             TelemetryService.Log("ERROR startListeners() before SDK is ready.");
             return;//not ready yet.
         }
         KeyManager keyManager = DJISDKManager.getInstance().getKeyManager();
-        for (DJIKeyInfo keyinfo : allKeys) {
+        for (DJIKeyInfo keyinfo : keys) {
             if (keyinfo.accessType == GET || keyinfo.accessType == PUSH) {
                 String keyName = keyinfo.controllerName + "." + keyinfo.keyName;
 
-                DJISDKManager.getInstance().getKeyManager().addListener(keyinfo.key, new KeyListener() {
+                if(keyListeners.containsKey(keyinfo.keyName))
+                {
+                    continue;//already installed.
+                }
+                KeyListener listener = new KeyListener() {
                     @Override public void onValueChange(@Nullable Object oldValue, @Nullable Object newValue) {
                         //Format the change message
                         TelemetryService.Log("PSH:"+keyName + "=" + DJIValueToString(newValue));
-                    }
-                });
+                    };
+                };
+
+                //install listener callback for key.
+                DJISDKManager.getInstance().getKeyManager().addListener(keyinfo.key, listener);
+
+                //save listener in info so we can remove listener if needed.
+                keyinfo.listener=listener;
+                keyListeners.put(keyinfo.keyName,keyinfo);
             }
         }
     }
 
-    //Do a get of all important keys.
+    //Do a get of all keys that have a listener.
     //Used to get the inital state.
     public static void doGetAll() {
         if (DJISDKManager.getInstance() == null || DJISDKManager.getInstance().getKeyManager() == null){
@@ -240,7 +274,7 @@ public class DJIKeyedInterface {
         }
 
         KeyManager keyManager = DJISDKManager.getInstance().getKeyManager();
-        for (DJIKeyInfo keyinfo : allKeys) {
+        for (DJIKeyInfo keyinfo : keyListeners.values()) {
             if (keyinfo.accessType == GET || keyinfo.accessType == PUSH) {
                 String keyName = keyinfo.controllerName + "." + keyinfo.keyName;
                 Object value = keyManager.getValue(keyinfo.key);
@@ -251,6 +285,8 @@ public class DJIKeyedInterface {
     }
 
     static DJIKeyInfo importantKeys[] = new DJIKeyInfo[]{
+            new DJIKeyInfo("FlightController", FlightControllerKey.SIMULATOR_STATE, PUSH, SimulatorState.class),
+            new DJIKeyInfo("FlightController", FlightControllerKey.IS_SIMULATOR_ACTIVE, PUSH, Boolean.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.AIRCRAFT_LOCATION, PUSH, LocationCoordinate3D.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.ALTITUDE, PUSH, Float.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.ATTITUDE_YAW, PUSH, Double.class),
@@ -274,7 +310,6 @@ public class DJIKeyedInterface {
             new DJIKeyInfo("FlightController", FlightControllerKey.GO_HOME_STATUS, PUSH, GoHomeExecutionState.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.IS_FLYING, PUSH, Boolean.class),
             new DJIKeyInfo("FlightController", FlightControllerKey.ARE_MOTOR_ON, PUSH, Boolean.class),
-            new DJIKeyInfo("FlightController", FlightControllerKey.SIMULATOR_STATE, PUSH, SimulatorState.class),
 
             new DJIKeyInfo("FlightController", FlightControllerKey.HOME_LOCATION, GET, LocationCoordinate2D.class),
 //null            new DJIKeyInfo("FlightController", FlightControllerKey.CONTROL_MODE, GET, ControlMode.class),

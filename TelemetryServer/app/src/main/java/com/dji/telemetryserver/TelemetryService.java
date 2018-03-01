@@ -226,6 +226,17 @@ public class TelemetryService {
                     webSocket.setStringCallback(new WebSocket.StringCallback() {
                         @Override
                         public void onStringAvailable(String s) {
+                            if(s.compareToIgnoreCase("start simulation")==0)
+                            {
+                                TelemetryService.Log("Staring simulation");
+                                DemoApplication.startSimulation();
+                            }
+                            if(s.compareToIgnoreCase("verbose")==0)
+                            {
+                                TelemetryService.Log("Verbose Mode");
+                                DJIKeyedInterface.startAllListeners();
+                                DJIKeyedInterface.doGetAll();
+                            }
                             //Toast.makeText(getApplicationContext(),s,Toast.LENGTH_SHORT).show();
                         }
                     });
@@ -308,10 +319,11 @@ public class TelemetryService {
                     response.send("text/html; charset=utf-8",bytes);
                 } catch (IOException e) {
                     e.printStackTrace();
+                    //response.code(404);
+                    //response.send("");
                 }
             //todo handle 404 etc.
-                response.code(404);
-                response.send("");
+
             }
         });
         httpServer.addAction("OPTIONS",".+", new HttpServerRequestCallback() {

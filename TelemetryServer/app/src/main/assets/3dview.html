@@ -23,13 +23,13 @@
 	   #wrapper {
 	   position:absolute;
 	   bottom:30px;
-	   top:40px;
-	   right:10px;
-		  width: 22%;
+	   top:0px;
+	   left:0px;
+	   width: 22%;
 		  margin: 0 auto;
 		  background: #333232bd;
 		color:lightcyan;
-		  border-radius: 10px;
+		  //border-radius: 10px;
 		  border-top: 1px solid #fff;
 	   }
 	   #status-panel {
@@ -40,9 +40,10 @@
 		 // left:10px;
 		  background: #333232bd;
 		color:lightcyan;
-		  border-radius: 10px;
+		  //border-radius: 10px;
 		  border-top: 1px solid #fff;
-		  overflow:auto;
+		  overflow-y: auto;
+		  overflow-x: hidden;
 	   }		
 	   #status-panel table {
 		   width:100%;
@@ -51,7 +52,7 @@
 	   #telemetry
 	   {
 	   		  list-style: none;
-			  padding-left:0px;
+			  padding-left:10px;
 	   }
 	   #telemetry .value
 	   {
@@ -59,7 +60,7 @@
 			  color:white;
 	   }	   
 	   #log-panel {
-		  height: 25%;
+		  height: 24%;
 		  padding-left: 4px;
 		  overflow-y:auto;
 		  overflow-x:hidden
@@ -73,16 +74,19 @@
 	   #log li {
 		  margin: 0;
 	   }
-	   #chat { width: 97%; }
+	   #chat { width: 97%;
+	   		position: absolute;
+    		bottom: 0px;
+    	}
 	   .message { font-weight: bold; }
 	   .message:before { content: ' '; color: #bbb; font-size: 14px; }
 
 	   .preview {
 		  position:absolute;
-		  width:640px;
-		  height:360px;
-		  top:20px;
-		  left:20px;
+		  width: 512px;
+		  height: 288px;
+		  bottom: 30px;
+		  right:20px;
 		  background:blue;
 	   }			   
 
@@ -111,6 +115,7 @@
 	   .panel-header {
 		  padding: 2px;
 		  color: #fff;
+		  background: #4444f5;
   		  border-radius: 2px;
 		  width=100%;
 	   }
@@ -118,7 +123,7 @@
 		  padding: 5px;
 		  color: #fff;
 		  background: #ccc;
-  		  border-radius: 10px;
+  		  //border-radius: 10px;
 	   }
 	   #status.fail {
 		  background: #c00;
@@ -148,10 +153,13 @@
 		<article>
                <div id = "status">Not connected</div>
 			<div id="status-panel"><ul id="telemetry" ></ul></div>
+            <div class="panel-header">Log</div>
                <div id = "log-panel">
-			   <div>Log</div>
 			   <ul id = "log"></ul>
-			</div>
+			   <form onsubmit = "addMessage(); return false;">
+				   <input type = "text" id = "chat" placeholder = "Send Command" />
+			   </form>
+			   </div>
                
 		</article>
      </section>
@@ -159,10 +167,8 @@
 </body>
 <script>
 	
-	//<form onsubmit = "addMessage(); return false;">
-		//<input type = "text" id = "chat" placeholder = "Send Command (not working yet)" />
-	   //</form>
-	   //form = chat.form;
+
+	   form = chat.form;
 	   
 	   connected = document.getElementById("connected");
 	   log = document.getElementById("log");
@@ -183,6 +189,9 @@
 	   }
 			
 	   function doConnect() {
+	   	if(state.className == "success")
+	   		return;//already connected.
+
 	   //var ip = "ws://"+ window.location.host+":3001";
 //		  var wsUri = "ws://"+ window.location.hostname+":3001";
                  var wsUri = "ws://192.168.1.2:3001";
@@ -191,9 +200,14 @@
 		  websocket.onclose = function(evt) { onClose(evt) };
 		  websocket.onmessage = function(evt) { onMessage(evt) };
 		  websocket.onerror = function(evt) { onError(evt) };
+
+		  //todo. Probably clear state panel here?
 	   }
 	   window.dodoConnect=doConnect;
-			
+
+//try to reconnect after disconnects.
+//	   setInterval(doConnect, 1000);
+
 	   function onOpen(evt) {
 		  state.className = "success";
 		  state.innerHTML = "Connected to server";
@@ -345,7 +359,10 @@
 	<script type='text/javascript'>//<![CDATA[
 	window.onload=function(){
 	var viewer = new Cesium.Viewer('cesiumContainer',{
-	//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
+		//sceneMode : Cesium.SceneMode.COLUMBUS_VIEW,
+	    navigationHelpButton:false,
+	    homeButton:false,
+	    navigationInstructionsInitiallyVisible:false,
 	});
 	var viewer2 = new Cesium.Viewer('preview',{
 	//	sceneMode : Cesium.SceneMode.COLUMBUS_VIEW
@@ -401,7 +418,8 @@
 			position : position,
 			orientation : orientation,
 			model : {
-				uri :  'MavicLOD.glb',
+//				uri :  'MavicLOD.glb',
+				uri :  'mavic.glb',
     			heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
 				minimumPixelSize : 22,
 				maximumScale : 20000,

@@ -10,6 +10,8 @@ import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.dji.videostreamdecodingsample.media.EncodeAndMuxTest;
+
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.simulator.InitializationData;
@@ -83,6 +85,8 @@ public class DemoApplication extends Application {
         //Todo. make this class static?
         telemetryService = new TelemetryService();
 
+        EncodeAndMuxTest test = new EncodeAndMuxTest();
+//        test.testEncodeVideoToMp4();
 
         /**
          * When starting SDK services, an instance of interface DJISDKManager.DJISDKManagerCallback will be used to listen to

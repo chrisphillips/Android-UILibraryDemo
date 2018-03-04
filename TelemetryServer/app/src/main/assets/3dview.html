@@ -187,14 +187,14 @@
 		  }
 		  window.addEventListener("load", doConnect, false);
 	   }
-			
+
 	   function doConnect() {
 	   	if(state.className == "success")
 	   		return;//already connected.
 
 	   //var ip = "ws://"+ window.location.host+":3001";
-//		  var wsUri = "ws://"+ window.location.hostname+":3001";
-                 var wsUri = "ws://192.168.1.2:3001";
+		  var wsUri = "ws://"+ window.location.hostname+":3001";
+//                 var wsUri = "ws://192.168.1.2:3001";
 		  websocket = new WebSocket(wsUri);
 		  websocket.onopen = function(evt) { onOpen(evt) };
 		  websocket.onclose = function(evt) { onClose(evt) };
@@ -302,8 +302,10 @@
 					{
 						var loc = keyValue.split(",");
 						if(loc.length==3){
-							window.aircraftEntity.position = Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),parseFloat(loc[2]))
-                            window.lastLoc = [parseFloat(loc[1]),parseFloat(loc[0])]
+						    if(parseFloat(loc[1])>0.1){//make sure not 0,0,0
+							    window.aircraftEntity.position = Cesium.Cartesian3.fromDegrees(parseFloat(loc[1]),parseFloat(loc[0]),parseFloat(loc[2]))
+                                window.lastLoc = [parseFloat(loc[1]),parseFloat(loc[0])]
+                            }
 						}
 					}
 				}

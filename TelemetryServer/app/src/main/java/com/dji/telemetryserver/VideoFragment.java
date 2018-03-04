@@ -5,6 +5,10 @@ import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.graphics.YuvImage;
+import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -36,6 +40,8 @@ import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.Camera;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.codec.DJICodecManager;
+
+import static android.media.MediaCodec.BUFFER_FLAG_END_OF_STREAM;
 
 /**
  * Created by djacc on 9/26/2016.
@@ -83,13 +89,70 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         super.onViewCreated(view, savedInstanceState);
 
         newViewCreated(view);
-
+//initMuxer();
         try {
             initVideoCallback();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+    }
+
+    private static MediaMuxer muxer;
+    private static int videoTrackIndex;
+    public static int presentationTimeUs=0;
+    private static boolean muxerRunning=false;
+    public static void initMuxer() {
+        try {
+            muxer = new MediaMuxer(Environment.getExternalStorageDirectory() + "/AAA.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // More often, the MediaFormat will be retrieved from MediaCodec.getOutputFormat()
+        // or MediaExtractor.getTrackFormat().
+        MediaFormat videoFormat = new MediaFormat();
+        MediaFormat outputFormat = MediaFormat.createVideoFormat( "video/avc", 1280, 720);
+        outputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+        outputFormat.setInteger(MediaFormat.KEY_BIT_RATE,12000);
+        outputFormat.setInteger(MediaFormat.KEY_FRAME_RATE,30);
+        outputFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL,1);
+
+        videoTrackIndex = muxer.addTrack(outputFormat);
+        presentationTimeUs=0;
+
+        muxer.start();
+        muxerRunning=true;
+
+    }
+    public static void doMux(byte[] input){
+        if(!muxerRunning)
+            return;
+//        int bufferSize=11111;
+//        ByteBuffer inputBuffer = ByteBuffer.allocate(bufferSize);
+        ByteBuffer inputBuffer = ByteBuffer.wrap(input,0,input.length);
+        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+
+
+        presentationTimeUs+=1000/30;
+        if(VideoFragment.presentationTimeUs>5000) {
+            muxerRunning = false;
+            bufferInfo.set(0, input.length, presentationTimeUs, BUFFER_FLAG_END_OF_STREAM);
+        }
+        else
+            bufferInfo.set(0,input.length,presentationTimeUs, MediaCodec.BUFFER_FLAG_KEY_FRAME);
+
+        int currentTrackIndex = videoTrackIndex;
+        muxer.writeSampleData(currentTrackIndex, inputBuffer, bufferInfo);
+        if(muxerRunning == false)
+            freeMuxer();
+    }
+    public static void freeMuxer()
+    {
+TelemetryService.Log("freeMuxer()");
+        muxer.stop();
+        muxer.release();
+TelemetryService.Log("freeMuxer() end");
     }
 
     private void initVideoCallback() throws IOException {
@@ -110,6 +173,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
                     //TelemetryService.LogDebug"codec onReceive to DJI");
                     mCodecManager.sendDataToDecoder(videoBuffer, size);
                 }
+
 
                 //screenshots codec.
                 boolean doSS = true;
@@ -255,6 +319,10 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         //for other codec.
         //createSurfaceListeners();
     }
+
+    //Enable to save raw video data to a .H264 file.
+    private boolean bCaptureVideo = false;
+
     private VideoFeeder.VideoDataCallback origCallback = null;
     private void setVideoCallbacks() {
         if(VideoFeeder.getInstance()!=null && VideoFeeder.getInstance().getPrimaryVideoFeed()!=null) {
@@ -265,10 +333,14 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
                     TelemetryService.LogDebug("codec origCallback is NULL");
                 origCallback=curCallback;
                 VideoFeeder.getInstance().getPrimaryVideoFeed().setCallback(mReceivedVideoDataCallBack);
-//            createH264(videoOutName);
+
+                if(bCaptureVideo)
+                    startVideoCapture();
             }
         }
     }
+
+
 
     private void initScreenShotCodec()
     {
@@ -290,6 +362,8 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
     private int screenShotInterval = 30;
     @Override
     public void onYuvDataReceived(byte[] yuvFrame, int width, int height) {
+
+
 //        TelemetryService.LogDebug"codec onYuvDataReceived");
         //In this demo, we test the YUV data by saving it into JPG files.
         if (screenShotInterval> 0 && (DJIVideoStreamDecoder.getInstance().frameIndex % screenShotInterval == 0)) {
@@ -384,17 +458,8 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         TelemetryService.LogDebug("PSH:Phone.screenshot="+remotePath);
     }
 
-    public void appendToFile(String filename, ByteBuffer bbuf)
-    {
-        File file = new File(filename);
-        boolean append = true;
-        try {
-            FileChannel wChannel = new FileOutputStream(file, append).getChannel();
-            wChannel.write(bbuf);
-            wChannel.close();
-        } catch (IOException e) {
-        }
-    }
+
+
     private byte[] getDefaultKeyFrame(int width) throws IOException {
         //int iframeId=getIframeRawId(product.getModel(), width);
         int iframeId = R.raw.iframe_1280x720_ins;
@@ -411,7 +476,7 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
         }
         return null;
     }
-    private String videoOutName = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/out.h264";
+    private static String videoCaptureFilename=null;
     public void createH264(String fileName) {
         byte[] iframe= new byte[0];
         try {
@@ -420,12 +485,38 @@ public class VideoFragment extends Fragment implements TextureView.SurfaceTextur
             e.printStackTrace();
         }
 
-        String videoOutName = fileName;
         //udpClient.send(ByteBuffer.wrap(iframe,0,iframe.length));
 
-        File file = new File(videoOutName);
+        File file = new File(fileName);
         file.delete();
-        appendToFile(videoOutName,ByteBuffer.wrap(iframe,0,iframe.length));
+        //save name for append.
+        videoCaptureFilename=fileName;
+        appendH264(iframe);
     }
+    public static void appendH264(byte[] bbuf)
+    {
+        if(videoCaptureFilename==null)
+            return;
+        File file = new File(videoCaptureFilename);
+        boolean append = true;
+        try {
+            FileChannel wChannel = new FileOutputStream(file, append).getChannel();
+            wChannel.write(ByteBuffer.wrap(bbuf));
+            wChannel.close();
+        } catch (IOException e) {
+        }
+    }
+    private void startVideoCapture()
+    {
+        String logDir = Environment.getExternalStorageDirectory() + "/DJI_Telemetry/videos/";
+        new File(logDir).mkdirs();
 
+        //set output log file name.
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        videoCaptureFilename = logDir + "" + timeStamp + ".h264";
+
+        TelemetryService.Log("startVideoCapture "+videoCaptureFilename);
+        createH264(videoCaptureFilename);
+
+    }
 }
